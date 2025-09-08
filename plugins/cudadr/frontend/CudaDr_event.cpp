@@ -23,11 +23,7 @@
  *             Department of Applied Science
  */
 
-#include <cstring>
-#include "CudaDrFrontend.h"
-#include "CudaUtil.h"
 #include "CudaDr.h"
-#include <cuda.h>
 
 using namespace std;
 
@@ -38,7 +34,7 @@ extern CUresult cuEventCreate(CUevent *phEvent, unsigned int Flags) {
     CudaDrFrontend::Execute("cuEventCreate");
     if (CudaDrFrontend::Success())
         *phEvent = (CUevent) (CudaDrFrontend::GetOutputDevicePointer());
-    return (CUresult) (CudaDrFrontend::GetExitCode());
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Destroys an event.*/
@@ -46,7 +42,7 @@ extern CUresult cuEventDestroy(CUevent hEvent) {
     CudaDrFrontend::Prepare();
     CudaDrFrontend::AddDevicePointerForArguments((void*) hEvent);
     CudaDrFrontend::Execute("cuEventDestroy");
-    return (CUresult) CudaDrFrontend::GetExitCode();
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Computes the elapsed time between two events.*/
@@ -58,7 +54,7 @@ extern CUresult cuEventElapsedTime(float *pMilliseconds, CUevent hStart, CUevent
     CudaDrFrontend::Execute("cuEventElapsedTime");
     if (CudaDrFrontend::Success())
         *pMilliseconds = *(CudaDrFrontend::GetOutputHostPointer<float>());
-    return (CUresult) (CudaDrFrontend::GetExitCode());
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Queries an event's status.*/
@@ -66,7 +62,7 @@ extern CUresult cuEventQuery(CUevent hEvent) {
     CudaDrFrontend::Prepare();
     CudaDrFrontend::AddDevicePointerForArguments((void*) hEvent);
     CudaDrFrontend::Execute("cuEventQuery");
-    return (CUresult) CudaDrFrontend::GetExitCode();
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Records an event.*/
@@ -75,7 +71,7 @@ extern CUresult cuEventRecord(CUevent hEvent, CUstream hStream) {
     CudaDrFrontend::AddDevicePointerForArguments((void*) hEvent);
     CudaDrFrontend::AddDevicePointerForArguments((void*) hStream);
     CudaDrFrontend::Execute("cuEventRecord");
-    return (CUresult) CudaDrFrontend::GetExitCode();
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Waits for an event to complete.*/
@@ -83,5 +79,5 @@ extern CUresult cuEventSynchronize(CUevent hEvent) {
     CudaDrFrontend::Prepare();
     CudaDrFrontend::AddDevicePointerForArguments((void*) hEvent);
     CudaDrFrontend::Execute("cuEventSynchronize");
-    return (CUresult) CudaDrFrontend::GetExitCode();
+    return CudaDrFrontend::GetExitCode();
 }

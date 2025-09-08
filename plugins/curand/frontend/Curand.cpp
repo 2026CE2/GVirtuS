@@ -23,9 +23,6 @@
  *             Department of Applied Science
  */
 
-#include <iostream>
-#include <cstdio>
-#include <string>
 #include <mutex>
 #include <unordered_map>
 
@@ -83,6 +80,18 @@ extern "C" curandStatus_t curandSetPseudoRandomGeneratorSeed(
     CurandFrontend::Execute("curandSetPseudoRandomGeneratorSeed");
     return CurandFrontend::GetExitCode();
 }
+
+extern "C" curandStatus_t CURANDAPI curandSetGeneratorOffset(
+    curandGenerator_t generator, unsigned long long offset) {
+    CurandFrontend::Prepare();
+    CurandFrontend::AddDevicePointerForArguments(generator);
+    CurandFrontend::AddVariableForArguments<unsigned long long>(offset);
+    CurandFrontend::Execute("curandSetGeneratorOffset");
+    return CurandFrontend::GetExitCode();
+}
+
+
+
 
 extern "C" curandStatus_t curandSetQuasiRandomGeneratorDimensions(
     curandGenerator_t generator, unsigned int num_dimensions) {

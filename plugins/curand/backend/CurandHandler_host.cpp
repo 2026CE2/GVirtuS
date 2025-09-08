@@ -23,9 +23,6 @@
  *             Department of Applied Science
  */
 
-#include <iostream>
-#include <cstdio>
-#include <string>
 #include <mutex>
 #include <unordered_map>
 
@@ -273,5 +270,19 @@ CURAND_ROUTINE_HANDLER(DestroyGenerator) {
         generator_is_host_map.erase(generator);
     }
 
+    return std::make_shared<Result>(cs);
+}
+
+CURAND_ROUTINE_HANDLER(SetGeneratorOffset) {
+    Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("SetGeneratorOffset"));
+
+    // Read inputs
+    curandGenerator_t generator = in->Get<curandGenerator_t>();
+    size_t offset = in->Get<size_t>();
+
+    // Call native CURAND function
+    curandStatus_t cs = curandSetGeneratorOffset(generator, offset);
+
+    // Return result
     return std::make_shared<Result>(cs);
 }

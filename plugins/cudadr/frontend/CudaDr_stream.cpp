@@ -23,11 +23,7 @@
  *             Department of Applied Science
  */
 
-#include <cstring>
-#include "CudaDrFrontend.h"
-#include "CudaUtil.h"
 #include "CudaDr.h"
-#include <cuda.h>
 
 using namespace std;
 
@@ -38,7 +34,7 @@ extern CUresult cuStreamCreate(CUstream *phStream, unsigned int Flags) {
     CudaDrFrontend::Execute("cuStreamCreate");
     if (CudaDrFrontend::Success())
         *phStream = (CUstream) (CudaDrFrontend::GetOutputDevicePointer());
-    return (CUresult) (CudaDrFrontend::GetExitCode());
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Destroys a stream.*/
@@ -46,7 +42,7 @@ extern CUresult cuStreamDestroy(CUstream hStream) {
     CudaDrFrontend::Prepare();
     CudaDrFrontend::AddDevicePointerForArguments((void*) hStream);
     CudaDrFrontend::Execute("cuStreamDestroy");
-    return (CUresult) CudaDrFrontend::GetExitCode();
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Determine status of a compute stream.*/
@@ -54,7 +50,7 @@ extern CUresult cuStreamQuery(CUstream hStream) {
     CudaDrFrontend::Prepare();
     CudaDrFrontend::AddDevicePointerForArguments((void*) hStream);
     CudaDrFrontend::Execute("cuStreamQuery");
-    return (CUresult) CudaDrFrontend::GetExitCode();
+    return CudaDrFrontend::GetExitCode();
 }
 
 /*Wait until a stream's tasks are completed.*/
@@ -62,5 +58,5 @@ extern CUresult cuStreamSynchronize(CUstream hStream) {
     CudaDrFrontend::Prepare();
     CudaDrFrontend::AddDevicePointerForArguments((void*) hStream);
     CudaDrFrontend::Execute("cuStreamSynchronize");
-    return (CUresult) CudaDrFrontend::GetExitCode();
+    return CudaDrFrontend::GetExitCode();
 }

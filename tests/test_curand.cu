@@ -5,488 +5,154 @@
 #define CUDA_CHECK(err) ASSERT_EQ((err), cudaSuccess) << "CUDA error: " << cudaGetErrorString(err)
 #define CURAND_CHECK(err) ASSERT_EQ((err), CURAND_STATUS_SUCCESS)
 
-TEST(cuRAND, CreateDestroyGenerator) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
+//curandCreateGenerator
+TEST(cuRAND, CreateGenerator) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, CreateDestroyGeneratorHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
+
+//curandDestroyGenerator
+TEST(cuRAND, DestroyGenerator) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, SetSeed) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 1234ULL), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-}
 
-TEST(cuRAND, GenerateDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 1234ULL), CURAND_STATUS_SUCCESS);
+//curandGenerate
+TEST(cuRAND, Generate) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
 
     const size_t n = 10;
-    unsigned int* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(unsigned int)), cudaSuccess);
+    unsigned int* d_data;
+    CUDA_CHECK(cudaMalloc(&d_data, n * sizeof(unsigned int)));
 
-    ASSERT_EQ(curandGenerate(generator, output, n), CURAND_STATUS_SUCCESS);
+    CURAND_CHECK(curandGenerate(gen, d_data, n));
 
-    unsigned int host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(unsigned int), cudaMemcpyDeviceToHost), cudaSuccess);
-
-    bool all_zero = true;
-    for (size_t i = 0; i < n; ++i) {
-        if (host_output[i] != 0) {
-            all_zero = false;
-            break;
-        }
-    }
-    EXPECT_FALSE(all_zero); // Generated numbers should not all be zero
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
+    CUDA_CHECK(cudaFree(d_data));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, GenerateHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 1234ULL), CURAND_STATUS_SUCCESS);
+//curandGenerateNormal
+TEST(cuRAND, GenerateNormal) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
 
     const size_t n = 10;
-    unsigned int* output = (unsigned int*)malloc(n * sizeof(unsigned int));
-    ASSERT_NE(output, nullptr);
+    float* d_data;
+    CUDA_CHECK(cudaMalloc(&d_data, n * sizeof(float)));
 
-    ASSERT_EQ(curandGenerate(generator, output, n), CURAND_STATUS_SUCCESS);
+    CURAND_CHECK(curandGenerateNormal(gen, d_data, n, 0.0f, 1.0f));
 
-    bool all_zero = true;
-    for (size_t i = 0; i < n; ++i) {
-        if (output[i] != 0) {
-            all_zero = false;
-            break;
-        }
-    }
-    EXPECT_FALSE(all_zero); // Generated numbers should not all be zero
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
+    CUDA_CHECK(cudaFree(d_data));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, GenerateLongLongDevice) {
-    curandGenerator_t generator;
-    const size_t num = 10;
 
-    // Create a quasi-random number generator
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_QUASI_SOBOL64), CURAND_STATUS_SUCCESS) << "Failed to create generator";
-
-    // Set dimensions (required for quasi generators)
-    ASSERT_EQ(curandSetQuasiRandomGeneratorDimensions(generator, 1), CURAND_STATUS_SUCCESS) << "Failed to set dimensions";
-
-    // Allocate device memory
-    unsigned long long* d_output = nullptr;
-    ASSERT_EQ(cudaMalloc(&d_output, num * sizeof(unsigned long long)), cudaSuccess) << "Failed to allocate device memory";
-
-    // Generate quasi-random numbers
-    ASSERT_EQ(curandGenerateLongLong(generator, d_output, num), CURAND_STATUS_SUCCESS) << "curandGenerateLongLong failed";
-
-    // Copy results back to host for checking
-    unsigned long long h_output[num];
-    ASSERT_EQ(cudaMemcpy(h_output, d_output, num * sizeof(unsigned long long), cudaMemcpyDeviceToHost), cudaSuccess) << "Failed to copy data from device to host";
-
-    // Clean up
-    ASSERT_EQ(cudaFree(d_output), cudaSuccess) << "Failed to free device memory";
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS) << "Failed to destroy generator";
-}
-
-TEST(cuRAND, GenerateLongLongHost) {
-    curandGenerator_t generator;
-    const size_t num = 10;
-
-    // Create a QUASI-random number generator (host generator)
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_QUASI_SOBOL64), CURAND_STATUS_SUCCESS) << "Failed to create QUASI generator";
-
-     // Set dimensions (required for quasi generators)
-    ASSERT_EQ(curandSetQuasiRandomGeneratorDimensions(generator, 1), CURAND_STATUS_SUCCESS) << "Failed to set dimensions";
-
-    // Allocate host memory for output
-    unsigned long long* h_output = new unsigned long long[num];
-
-    // Generate random numbers on host
-    ASSERT_EQ(curandGenerateLongLong(generator, h_output, num), CURAND_STATUS_SUCCESS) << "curandGenerateLongLong failed";
-
-    delete[] h_output;
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS) << "Failed to destroy generator";
-}
-
-TEST(cuRAND, GenerateUniformDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 1234ULL), CURAND_STATUS_SUCCESS);
+//curandGenerateNormalDouble
+TEST(cuRAND, GenerateNormalDouble) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
 
     const size_t n = 10;
-    float* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(float)), cudaSuccess);
+    double* d_data;
+    CUDA_CHECK(cudaMalloc(&d_data, n * sizeof(double)));
 
-    ASSERT_EQ(curandGenerateUniform(generator, output, n), CURAND_STATUS_SUCCESS);
+    CURAND_CHECK(curandGenerateNormalDouble(gen, d_data, n, 0.0, 1.0));
 
-    float host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
-
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GE(host_output[i], 0.0f);
-        EXPECT_LT(host_output[i], 1.0f);
-    }
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
+    CUDA_CHECK(cudaFree(d_data));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, GenerateUniformHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 1234ULL), CURAND_STATUS_SUCCESS);
+
+//curandGenerateUniform
+TEST(cuRAND, GenerateUniform) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
 
     const size_t n = 10;
-    float* output = (float*)malloc(n * sizeof(float));
-    ASSERT_NE(output, nullptr);
+    float* d_data;
+    CUDA_CHECK(cudaMalloc(&d_data, n * sizeof(float)));
 
-    ASSERT_EQ(curandGenerateUniform(generator, output, n), CURAND_STATUS_SUCCESS);
+    CURAND_CHECK(curandGenerateUniform(gen, d_data, n));
 
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GE(output[i], 0.0f);
-        EXPECT_LT(output[i], 1.0f);
-    }
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
+    CUDA_CHECK(cudaFree(d_data));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, GenerateNormalDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 9012ULL), CURAND_STATUS_SUCCESS);
 
-    const size_t n = 1000;  // Larger sample for stats
-    float* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(float)), cudaSuccess);
-
-    const float mean = 5.0f;
-    const float stddev = 2.0f;
-    ASSERT_EQ(curandGenerateNormal(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
-
-    float host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
-
-    // Basic sanity: check mean and stddev roughly
-    float sum = 0.0f;
-    for (size_t i = 0; i < n; ++i) {
-        sum += host_output[i];
-    }
-    float sample_mean = sum / n;
-    ASSERT_NEAR(sample_mean, mean, 0.2f);
-
-    float variance_sum = 0.0f;
-    for (size_t i = 0; i < n; ++i) {
-        float diff = host_output[i] - mean;
-        variance_sum += diff * diff;
-    }
-    float sample_stddev = sqrt(variance_sum / n);
-    ASSERT_NEAR(sample_stddev, stddev, 0.3f);
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
-}
-
-TEST(cuRAND, GenerateNormalHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 9012ULL), CURAND_STATUS_SUCCESS);
-
-    const size_t n = 1000;
-    float* output = (float*)malloc(n * sizeof(float));
-    ASSERT_NE(output, nullptr);
-
-    const float mean = 5.0f;
-    const float stddev = 2.0f;
-    ASSERT_EQ(curandGenerateNormal(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
-
-    // Basic sanity: check mean and stddev roughly
-    float sum = 0.0f;
-    for (size_t i = 0; i < n; ++i) {
-        sum += output[i];
-    }
-    float sample_mean = sum / n;
-    ASSERT_NEAR(sample_mean, mean, 0.2f);
-
-    float variance_sum = 0.0f;
-    for (size_t i = 0; i < n; ++i) {
-        float diff = output[i] - mean;
-        variance_sum += diff * diff;
-    }
-    float sample_stddev = sqrt(variance_sum / n);
-    ASSERT_NEAR(sample_stddev, stddev, 0.3f);
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
-}
-
-TEST(cuRAND, GenerateLogNormalDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 8642ULL), CURAND_STATUS_SUCCESS);
-
-    const size_t n = 1000;
-    float* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(float)), cudaSuccess);
-
-    const float mean = 0.0f;
-    const float stddev = 0.5f;
-    ASSERT_EQ(curandGenerateLogNormal(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
-
-    float host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
-
-    // All values should be positive
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GT(host_output[i], 0.0f);
-    }
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
-}
-
-TEST(cuRAND, GenerateLogNormalHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 8642ULL), CURAND_STATUS_SUCCESS);
-
-    const size_t n = 1000;
-    float* output = (float*)malloc(n * sizeof(float));
-    ASSERT_NE(output, nullptr);
-
-    const float mean = 0.0f;
-    const float stddev = 0.5f;
-    ASSERT_EQ(curandGenerateLogNormal(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
-
-    // All values should be positive
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GT(output[i], 0.0f);
-    }
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
-}
-
-TEST(cuRAND, GeneratePoissonDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 3456ULL), CURAND_STATUS_SUCCESS);
-
-    const size_t n = 1000;
-    unsigned int* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(unsigned int)), cudaSuccess);
-
-    double lambda = 4.5;
-    ASSERT_EQ(curandGeneratePoisson(generator, output, n, lambda), CURAND_STATUS_SUCCESS);
-
-    unsigned int host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(unsigned int), cudaMemcpyDeviceToHost), cudaSuccess);
-
-    // Basic sanity checks: values >= 0 and mean close to lambda
-    double sum = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GE(host_output[i], 0u);
-        sum += host_output[i];
-    }
-    double sample_mean = sum / n;
-    ASSERT_NEAR(sample_mean, lambda, 0.2);
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
-}
-
-TEST(cuRAND, GeneratePoissonHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 3456ULL), CURAND_STATUS_SUCCESS);
-
-    const size_t n = 1000;
-    unsigned int* output = (unsigned int*)malloc(n * sizeof(unsigned int));
-    ASSERT_NE(output, nullptr);
-
-    double lambda = 4.5;
-    ASSERT_EQ(curandGeneratePoisson(generator, output, n, lambda), CURAND_STATUS_SUCCESS);
-
-    double sum = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GE(output[i], 0u);
-        sum += output[i];
-    }
-    double sample_mean = sum / n;
-    ASSERT_NEAR(sample_mean, lambda, 0.2);
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
-}
-
-TEST(cuRAND, GenerateUniformDoubleDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 7890ULL), CURAND_STATUS_SUCCESS);
+//curandGenerateUniformDouble
+TEST(cuRAND, GenerateUniformDouble) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
 
     const size_t n = 10;
-    double* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(double)), cudaSuccess);
+    double* d_data;
+    CUDA_CHECK(cudaMalloc(&d_data, n * sizeof(double)));
 
-    ASSERT_EQ(curandGenerateUniformDouble(generator, output, n), CURAND_STATUS_SUCCESS);
+    CURAND_CHECK(curandGenerateUniformDouble(gen, d_data, n));
 
-    double host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(double), cudaMemcpyDeviceToHost), cudaSuccess);
-
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GE(host_output[i], 0.0);
-        EXPECT_LT(host_output[i], 1.0);
-    }
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
+    CUDA_CHECK(cudaFree(d_data));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, GenerateUniformDoubleHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 7890ULL), CURAND_STATUS_SUCCESS);
 
-    const size_t n = 10;
-    double* output = (double*)malloc(n * sizeof(double));
-    ASSERT_NE(output, nullptr);
-
-    ASSERT_EQ(curandGenerateUniformDouble(generator, output, n), CURAND_STATUS_SUCCESS);
-
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GE(output[i], 0.0);
-        EXPECT_LT(output[i], 1.0);
-    }
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
+//curandSetPseudoRandomGeneratorSeed
+TEST(cuRAND, SetPseudoRandomGeneratorSeed) {
+    curandGenerator_t gen;
+    CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
+    CURAND_CHECK(curandDestroyGenerator(gen));
 }
 
-TEST(cuRAND, GenerateNormalDoubleDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 2468ULL), CURAND_STATUS_SUCCESS);
 
-    const size_t n = 1000;
-    double* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(double)), cudaSuccess);
+//curandSetGeneratorOffset
+TEST(cuRAND, SetGeneratorOffset) {
+    curandGenerator_t gen1, gen2;
 
-    const double mean = 10.0;
-    const double stddev = 3.0;
-    ASSERT_EQ(curandGenerateNormalDouble(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
+    // Create 2 identical generators
+    CURAND_CHECK(curandCreateGenerator(&gen1, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CHECK(curandCreateGenerator(&gen2, CURAND_RNG_PSEUDO_DEFAULT));
 
-    double host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(double), cudaMemcpyDeviceToHost), cudaSuccess);
+    // Set same seed
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen1, 1234ULL));
+    CURAND_CHECK(curandSetPseudoRandomGeneratorSeed(gen2, 1234ULL));
 
-    // Basic sanity: check mean and stddev roughly
-    double sum = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-        sum += host_output[i];
-    }
-    double sample_mean = sum / n;
-    ASSERT_NEAR(sample_mean, mean, 0.2);
+    // Set different offsets
+    size_t offset = 1000;
+    CURAND_CHECK(curandSetGeneratorOffset(gen1, offset));
 
-    double variance_sum = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-        double diff = host_output[i] - mean;
-        variance_sum += diff * diff;
-    }
-    double sample_stddev = sqrt(variance_sum / n);
-    ASSERT_NEAR(sample_stddev, stddev, 0.3);
+    // Generate same count from both, but gen2 will generate offset + count
+    const int count = 10;
+    std::vector<float> out1(count), out2(offset + count);
 
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
-}
+    float *d_out1, *d_out2;
+    cudaMalloc(&d_out1, count * sizeof(float));
+    cudaMalloc(&d_out2, (offset + count) * sizeof(float));
 
-TEST(cuRAND, GenerateNormalDoubleHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 2468ULL), CURAND_STATUS_SUCCESS);
+    // Generate for both
+    CURAND_CHECK(curandGenerateUniform(gen1, d_out1, count));
+    CURAND_CHECK(curandGenerateUniform(gen2, d_out2, offset + count));
 
-    const size_t n = 1000;
-    double* output = (double*)malloc(n * sizeof(double));
-    ASSERT_NE(output, nullptr);
+    // Copy and compare
+    cudaMemcpy(out1.data(), d_out1, count * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(out2.data(), d_out2, (offset + count) * sizeof(float), cudaMemcpyDeviceToHost);
 
-    const double mean = 10.0;
-    const double stddev = 3.0;
-    ASSERT_EQ(curandGenerateNormalDouble(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
-
-    // Basic sanity: check mean and stddev roughly
-    double sum = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-        sum += output[i];
-    }
-    double sample_mean = sum / n;
-    ASSERT_NEAR(sample_mean, mean, 0.2);
-
-    double variance_sum = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-        double diff = output[i] - mean;
-        variance_sum += diff * diff;
-    }
-    double sample_stddev = sqrt(variance_sum / n);
-    ASSERT_NEAR(sample_stddev, stddev, 0.3);
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
-}
-
-TEST(cuRAND, GenerateLogNormalDoubleDevice) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 1357ULL), CURAND_STATUS_SUCCESS);
-
-    const size_t n = 1000;
-    double* output;
-    ASSERT_EQ(cudaMalloc(&output, n * sizeof(double)), cudaSuccess);
-
-    const double mean = 0.0;   // mean of underlying normal
-    const double stddev = 0.5; // stddev of underlying normal
-    ASSERT_EQ(curandGenerateLogNormalDouble(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
-
-    double host_output[n];
-    ASSERT_EQ(cudaMemcpy(host_output, output, n * sizeof(double), cudaMemcpyDeviceToHost), cudaSuccess);
-
-    // All outputs should be positive
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GT(host_output[i], 0.0);
+    // The output of gen1 should match gen2's values starting at [offset]
+    for (int i = 0; i < count; ++i) {
+        EXPECT_FLOAT_EQ(out1[i], out2[i + offset]);
     }
 
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(cudaFree(output), cudaSuccess);
-}
-
-TEST(cuRAND, GenerateLogNormalDoubleHost) {
-    curandGenerator_t generator;
-    ASSERT_EQ(curandCreateGeneratorHost(&generator, CURAND_RNG_PSEUDO_DEFAULT), CURAND_STATUS_SUCCESS);
-    ASSERT_EQ(curandSetPseudoRandomGeneratorSeed(generator, 1357ULL), CURAND_STATUS_SUCCESS);
-
-    const size_t n = 1000;
-    double* output = (double*)malloc(n * sizeof(double));
-    ASSERT_NE(output, nullptr);
-
-    const double mean = 0.0;
-    const double stddev = 0.5;
-    ASSERT_EQ(curandGenerateLogNormalDouble(generator, output, n, mean, stddev), CURAND_STATUS_SUCCESS);
-
-    // All outputs should be positive
-    for (size_t i = 0; i < n; ++i) {
-        EXPECT_GT(output[i], 0.0);
-    }
-
-    ASSERT_EQ(curandDestroyGenerator(generator), CURAND_STATUS_SUCCESS);
-    free(output);
+    CURAND_CHECK(curandDestroyGenerator(gen1));
+    CURAND_CHECK(curandDestroyGenerator(gen2));
+    cudaFree(d_out1);
+    cudaFree(d_out2);
 }

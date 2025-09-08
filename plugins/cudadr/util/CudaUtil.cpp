@@ -33,11 +33,9 @@
  *
  */
 
-#include "CudaUtil.h"
-
 #include <cstdio>
-#include <iostream>
 
+#include <CudaUtil.h>
 #include <cuda.h>
 
 using namespace std;
@@ -128,12 +126,7 @@ Buffer * CudaUtil::MarshalFatCudaBinary(__cudaFatCudaBinary* bin, Buffer * marsh
 
     /* Achtung: no debug is possible */
     marshal->Add(0);
-
-#if 0
-    for (count = 0; bin->exported != NULL && bin->exported[count].name != NULL; count++);
-#else
     count = 0;
-#endif
     marshal->Add(count);
     for (int i = 0; i < count; i++) {
         size = strlen(bin->exported[i].name) + 1;
@@ -141,11 +134,7 @@ Buffer * CudaUtil::MarshalFatCudaBinary(__cudaFatCudaBinary* bin, Buffer * marsh
         marshal->Add(bin->exported[i].name, size);
     }
 
-#if 0
-    for (count = 0; bin->imported != NULL && bin->imported[count].name != NULL; count++);
-#else
     count = 0;
-#endif
     marshal->Add(count);
     for (int i = 0; i < count; i++) {
         size = strlen(bin->imported[i].name) + 1;
@@ -196,21 +185,7 @@ __fatBinC_Wrapper_t * CudaUtil::UnmarshalFatCudaBinaryV2(Buffer* marshal) {
     bin->magic = marshal->Get<int>();
     bin->version = marshal->Get<int>();
     size = marshal->Get<size_t>();
-//    bin->data = marshal->Get<unsigned long long int>(size);
     bin->data = (const long long unsigned int*)marshal->Get<char>(size);
-    //bin->data= NULL;
-    /*
-    cerr << "**********DATA**********" << endl; 
-    fprintf(stderr, "data pointer: %p\n", bin->data);
-    if (bin->data == NULL)
-        throw "Error allocating";
-
-    char* data = (char*)bin->data;
-    for (int i = 0; i < (size * sizeof(long long int)); i++) {
-        fprintf(stderr, "%x ", *(data + i));
-    }
-    cerr << endl << "********** END DATA**********" << endl;
-     */
     bin->filename_or_fatbins = NULL;
     return bin;
 }
@@ -327,14 +302,6 @@ void CudaUtil::DumpFatCudaBinary(__cudaFatCudaBinary* bin, ostream & out) {
         out << '\t' << "gpuProfileName[" << i << "]: " << bin->cubin[i].gpuProfileName << endl;
         out << '\t' << "cubin[" << i << "]: " << bin->cubin[i].cubin << endl;
     }
-#if 0
-    out << "debug:" << endl;
-    for (int i = 0; bin->debug[i].gpuProfileName != NULL; i++) {
-        out << '\t' << "gpuProfileName[" << i << "]: " << bin->debug[i].gpuProfileName << endl;
-        out << '\t' << "debug[" << i << "]: " << bin->debug[i].debug << endl;
-    }
-    out << "debugInfo: " << bin->debugInfo << endl;
-#endif
     out << "exported:" << endl;
     for (int i = 0; bin->exported != NULL && bin->exported[i].name != NULL; i++) {
         out << '\t' << "name[" << i << "]: " << bin->exported[i].name << endl;
@@ -344,12 +311,6 @@ void CudaUtil::DumpFatCudaBinary(__cudaFatCudaBinary* bin, ostream & out) {
         out << '\t' << "name[" << i << "]: " << bin->imported[i].name << endl;
     }
     out << "flags: " << bin->flags << endl;
-#if 0
-    out << "dependends:" << endl;
-    for (int i = 0; bin->dependends != NULL && bin->dependends[i].key != NULL; i++) {
-        CudaUtil::DumpFatCudaBinary(bin->dependends + i);
-    }
-#endif
 #ifndef CUDA_VERSION
 #error CUDA_VERSION not defined
 #endif

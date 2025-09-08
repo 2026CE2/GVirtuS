@@ -25,10 +25,6 @@
 #ifndef CUDNNFRONTEND_H
 #define	CUDNNFRONTEND_H
 
-#include <map>
-#include <set>
-#include <stack>
-#include <list>
 #include <iostream>
 
 #include <cudnn.h>
@@ -67,30 +63,10 @@ public:
      * request.
      *
      * @param var the variable to add as a parameter.
-
+     */
     template <class T> static inline void AddVariableForArguments(T var) {
         Frontend::GetFrontend()->GetInputBuffer()->Add(var);
     }
-*/
-//
-template <typename T>
-static inline typename std::enable_if<
-    !std::is_void<T>::value && !std::is_function<T>::value>::type
-AddVariableForArguments(T val) {
-    Frontend::GetFrontend()->GetInputBuffer()->Add(&val, 1);
-}
-
-//
-static inline void AddVariableForArguments(void* ptr) {
-    long long int val = reinterpret_cast<long long int>(ptr);
-    Frontend::GetFrontend()->GetInputBuffer()->Add(&val, 1);
-}
-
-//
-static inline void AddVariableForArguments(const void* ptr) {
-    long long int val = reinterpret_cast<long long int>(ptr);
-    Frontend::GetFrontend()->GetInputBuffer()->Add(&val, 1);
-}
 
     /**
      * Adds a string (array of char(s)) as an input parameter for the next
@@ -110,36 +86,10 @@ static inline void AddVariableForArguments(const void* ptr) {
      *
      * @param ptr the pointer to add as a parameter.
      * @param n the length of the array, if ptr is an array.
-
+     */
     template <class T>static inline void AddHostPointerForArguments(T *ptr, size_t n = 1) {
         Frontend::GetFrontend()->GetInputBuffer()->Add(ptr, n);
     }
-    */
-// ✅ 通用模板：禁止 void
-template <typename T>
-static inline typename std::enable_if<!std::is_void<T>::value>::type
-AddHostPointerForArguments(T* ptr, size_t n = 1) {
-    Frontend::GetFrontend()->GetInputBuffer()->Add(ptr, n);
-}
-
-// ✅ 明确支持 void*（默认按 sizeof(void*) 传输）
-static inline void AddHostPointerForArguments(void* ptr) {
-    auto byte_ptr = reinterpret_cast<const uint8_t*>(&ptr);
-    Frontend::GetFrontend()->GetInputBuffer()->Add(byte_ptr, sizeof(void*));
-}
-
-// ✅ 明确支持 const void*（同上）
-static inline void AddHostPointerForArguments(const void* ptr) {
-    auto byte_ptr = reinterpret_cast<const uint8_t*>(&ptr);
-    Frontend::GetFrontend()->GetInputBuffer()->Add(byte_ptr, sizeof(void*));
-}
-
-// ✅ 可选：手动指定大小（用于原始 buffer 拷贝）
-static inline void AddHostPointerForArguments(const void* ptr, size_t bytes) {
-    auto byte_ptr = reinterpret_cast<const uint8_t*>(ptr);
-    Frontend::GetFrontend()->GetInputBuffer()->Add(byte_ptr, bytes);
-}
-
 
     /**
      * Adds a device pointer as an input parameter for the next execution
@@ -161,7 +111,7 @@ static inline void AddHostPointerForArguments(const void* ptr, size_t bytes) {
         /* TODO: implement AddSymbolForArguments
          * AddStringForArguments(CudaUtil::MarshalHostPointer((void *) symbol));
          * AddStringForArguments(symbol);
-         * */
+         */
     }
 
     static inline cudnnStatus_t GetExitCode() {

@@ -23,12 +23,17 @@
  *             Department of Applied Science
  */
 
-#include <cuda.h>
 #include "CudaDrHandler.h"
-#include <driver_types.h>
+
+using namespace log4cplus;
+
+using gvirtus::communicators::Buffer;
+using gvirtus::communicators::Result;
 
 CUDA_DRIVER_HANDLER(Init) {
+    Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("Init"));
     unsigned int flags = input_buffer->Get<unsigned int>();
-    CUresult exit_code = cuInit(flags);
-    return std::make_shared<Result>((cudaError_t) exit_code);
+    CUresult cs = cuInit(flags);
+    LOG4CPLUS_DEBUG(logger, "Init executed with flags: " << flags);
+    return std::make_shared<Result>(cs);
 }

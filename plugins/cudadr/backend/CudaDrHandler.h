@@ -34,26 +34,31 @@
 #include <memory>
 #include <string>
 #include <cstdio>
-#include <host_defines.h>
 #include <builtin_types.h>
 #include <driver_types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include "communicator/Result.h"
 #include <cuda.h>
-#include "Handler.h"
+
+#include <gvirtus/backend/Handler.h>
+#include <gvirtus/communicators/Result.h>
 
 #include "log4cplus/logger.h"
 #include "log4cplus/loggingmacros.h"
 #include "log4cplus/configurator.h"
 
-class CudaDrHandler : public Handler{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+using namespace log4cplus;
+
+class CudaDrHandler : public gvirtus::backend::Handler {
 public:
     CudaDrHandler();
     virtual ~CudaDrHandler();
     bool CanExecute(std::string routine);
-    std::shared_ptr<Result> Execute(std::string routine, std::shared_ptr<Buffer> input_buffer);
+    std::shared_ptr<gvirtus::communicators::Result> Execute(std::string routine, std::shared_ptr<gvirtus::communicators::Buffer> input_buffer);
 
     void RegisterFatBinary(std::string & handler, void **fatCubinHandle);
     void RegisterFatBinary(const char * handler, void **fatCubinHandle);
@@ -72,40 +77,33 @@ public:
     const char *GetVar(std::string & handler);
     const char *GetVar(const char *handler);
 
-    // void RegisterTexture(std::string & handler, cudaTextureObject_t* texref);
-    // void RegisterTexture(const char *handler, cudaTextureObject_t* texref);
-    // cudaTextureObject_t* GetTexture(std::string & handler);
-    // cudaTextureObject_t* GetTexture(const char *handler);
-    // const char *GetTextureHandler(cudaTextureObject_t* texref);
-
-    // const char *GetSymbol(Buffer * in);
+    const char *GetSymbol(gvirtus::communicators::Buffer * in);
 
     void RegisterSharedMemory(const char *name) {
         mShmFd = shm_open(name, O_RDWR, S_IRWXU);
 
-	if((mpShm = mmap(NULL, 256 * 1024 * 1024, PROT_READ | PROT_WRITE, MAP_SHARED, mShmFd,
-            0)) == MAP_FAILED) {
-		std::cout << "Failed to mmap" << std::endl;
-                mpShm = NULL;
+        if((mpShm = mmap(NULL, 256 * 1024 * 1024, PROT_READ | PROT_WRITE, MAP_SHARED, mShmFd,
+                0)) == MAP_FAILED) {
+            std::cerr << "Failed to mmap" << std::endl;
+            mpShm = NULL;
         }
     }
 
     void RequestSharedMemory(char *name, size_t *size) {
         sprintf(name, "/gvirtus-%d", getpid());
         *size = 128 * 1024 * 1024;
-        std::cout << "SHM name " << name << std::endl;
 
         mShmFd = shm_open(name, O_RDWR | O_CREAT, 00666);
 
         if(ftruncate(mShmFd, *size) != 0) {
-            std::cout << "Failed to truncate" << std::endl;
+            std::cerr << "Failed to truncate" << std::endl;
             mpShm = NULL;
             return;
         }
 
 	if((mpShm = mmap(NULL, *size, PROT_READ | PROT_WRITE, MAP_SHARED, mShmFd,
             0)) == MAP_FAILED) {
-		std::cout << "Failed to mmap" << std::endl;
+		std::cerr << "Failed to mmap" << std::endl;
                 mpShm = NULL;
         }
     }
@@ -122,7 +120,7 @@ public:
 private:
     log4cplus::Logger logger;
     void Initialize();
-    typedef std::shared_ptr<Result> (*CudaDriverHandler)(CudaDrHandler *, std::shared_ptr<Buffer>);
+    typedef std::shared_ptr<gvirtus::communicators::Result> (*CudaDriverHandler)(CudaDrHandler *, std::shared_ptr<gvirtus::communicators::Buffer>);
     static std::map<std::string, CudaDriverHandler> * mspHandlers;
     std::map<std::string, void **> * mpFatBinary;
     std::map<std::string, std::string> * mpDeviceFunction;
@@ -133,7 +131,7 @@ private:
 };
 
 
-#define CUDA_DRIVER_HANDLER(name) std::shared_ptr<Result> handle##name(CudaDrHandler * pThis, std::shared_ptr<Buffer> input_buffer)
+#define CUDA_DRIVER_HANDLER(name) std::shared_ptr<gvirtus::communicators::Result> handle##name(CudaDrHandler * pThis, std::shared_ptr<gvirtus::communicators::Buffer> input_buffer)
 #define CUDA_DRIVER_HANDLER_PAIR(name) make_pair("cu" #name, handle##name)
 
 /*CudaDrHandler_initialization*/
@@ -142,16 +140,16 @@ CUDA_DRIVER_HANDLER(Init);
 /*CudaDrHandler_context*/
 CUDA_DRIVER_HANDLER(CtxCreate);
 CUDA_DRIVER_HANDLER(CtxDestroy);
-// CUDA_DRIVER_HANDLER(CtxAttach);
-// CUDA_DRIVER_HANDLER(CtxDetach);
+CUDA_DRIVER_HANDLER(CtxAttach);
+CUDA_DRIVER_HANDLER(CtxDetach);
 CUDA_DRIVER_HANDLER(CtxGetDevice);
 CUDA_DRIVER_HANDLER(CtxPopCurrent);
 CUDA_DRIVER_HANDLER(CtxPushCurrent);
 CUDA_DRIVER_HANDLER(CtxSynchronize);
-
 CUDA_DRIVER_HANDLER(CtxDisablePeerAccess);
 CUDA_DRIVER_HANDLER(CtxEnablePeerAccess);
 CUDA_DRIVER_HANDLER(DeviceCanAccessPeer);
+CUDA_DRIVER_HANDLER(DevicePrimaryCtxGetState);
 
 /*CudaDrHandler_device*/
 CUDA_DRIVER_HANDLER(DeviceComputeCapability);
@@ -198,7 +196,7 @@ CUDA_DRIVER_HANDLER(ModuleUnload);
 CUDA_DRIVER_HANDLER(ModuleGetFunction);
 CUDA_DRIVER_HANDLER(ModuleGetGlobal);
 CUDA_DRIVER_HANDLER(ModuleLoadDataEx);
-// CUDA_DRIVER_HANDLER(ModuleGetTexRef);
+CUDA_DRIVER_HANDLER(ModuleGetTexRef);
 
 /*CudaDrHandler_version*/
 CUDA_DRIVER_HANDLER(DriverGetVersion);
@@ -218,15 +216,15 @@ CUDA_DRIVER_HANDLER(EventRecord);
 CUDA_DRIVER_HANDLER(EventSynchronize);
 
 /*CudaDrHandler_texture*/
-// CUDA_DRIVER_HANDLER(TexRefSetArray);
-// CUDA_DRIVER_HANDLER(TexRefSetAddressMode);
-// CUDA_DRIVER_HANDLER(TexRefSetFilterMode);
-// CUDA_DRIVER_HANDLER(TexRefSetFlags);
-// CUDA_DRIVER_HANDLER(TexRefSetFormat);
-// CUDA_DRIVER_HANDLER(TexRefGetAddress);
-// CUDA_DRIVER_HANDLER(TexRefGetArray);
-// CUDA_DRIVER_HANDLER(TexRefGetFlags);
-// CUDA_DRIVER_HANDLER(TexRefSetAddress);
+CUDA_DRIVER_HANDLER(TexRefSetArray);
+CUDA_DRIVER_HANDLER(TexRefSetAddressMode);
+CUDA_DRIVER_HANDLER(TexRefSetFilterMode);
+CUDA_DRIVER_HANDLER(TexRefSetFlags);
+CUDA_DRIVER_HANDLER(TexRefSetFormat);
+CUDA_DRIVER_HANDLER(TexRefGetAddress);
+CUDA_DRIVER_HANDLER(TexRefGetArray);
+CUDA_DRIVER_HANDLER(TexRefGetFlags);
+CUDA_DRIVER_HANDLER(TexRefSetAddress);
 
 /*New Cuda 6.5 functions*/
 CUDA_DRIVER_HANDLER(LaunchKernel);

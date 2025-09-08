@@ -23,18 +23,14 @@
  *             Department of Applied Science
  */
 //#define DEBUG
-#include <host_defines.h>
-#include <builtin_types.h>
-#include <driver_types.h>
-#include <GL/gl.h>
-#include <cuda_runtime_api.h>
-#include <cstring>
-#include "CudaUtil.h"
+
 #include "CudaDrHandler.h"
-#include <cuda.h>
 
 using namespace std;
 using namespace log4cplus;
+
+using gvirtus::communicators::Buffer;
+using gvirtus::communicators::Result;
 
 map<string, CudaDrHandler::CudaDriverHandler> *CudaDrHandler::mspHandlers = NULL;
 
@@ -66,9 +62,6 @@ bool CudaDrHandler::CanExecute(std::string routine) {
 
 std::shared_ptr<Result> CudaDrHandler::Execute(std::string routine, std::shared_ptr<Buffer> input_buffer) {
     map<string, CudaDrHandler::CudaDriverHandler>::iterator it;
-//#ifdef DEBUG
-//    std::cout<<"Called "<<routine<<std::endl;
-//#endif    
     LOG4CPLUS_DEBUG(logger, "Called " << routine);
 
     it = mspHandlers->find(routine);
@@ -83,9 +76,6 @@ void CudaDrHandler::RegisterFatBinary(std::string& handler, void ** fatCubinHand
         mpFatBinary->erase(it);
     }
     mpFatBinary->insert(make_pair(handler, fatCubinHandle));
-//#ifdef DEBUG
-//    cout << "Registered FatBinary " << fatCubinHandle << " with handler " << handler << endl;
-//#endif 
     LOG4CPLUS_DEBUG(logger, "Registered FatBinary " << fatCubinHandle << " with handler " << handler);
 }
 
@@ -111,9 +101,6 @@ void CudaDrHandler::UnregisterFatBinary(std::string& handler) {
     if (it == mpFatBinary->end())
         return;
     /* FIXME: think about freeing memory */
-//#ifdef DEBUG
-//    cout << "Unregistered FatBinary " << it->second << " with handler "<< handler << endl;
-//#endif
     LOG4CPLUS_DEBUG(logger, "Unregistered FatBinary " << it->second << " with handler "<< handler);
     mpFatBinary->erase(it);
 }
@@ -128,9 +115,6 @@ void CudaDrHandler::RegisterDeviceFunction(std::string & handler, std::string & 
     if (it != mpDeviceFunction->end())
         mpDeviceFunction->erase(it);
     mpDeviceFunction->insert(make_pair(handler, function));
-//#ifdef DEBUG
-//    cout << "Registered DeviceFunction " << function << " with handler " << handler << endl;
-//#endif
     LOG4CPLUS_DEBUG(logger, "Registered DeviceFunction " << function << " with handler " << handler);
 }
 
@@ -154,9 +138,6 @@ const char *CudaDrHandler::GetDeviceFunction(const char * handler) {
 
 void CudaDrHandler::RegisterVar(string & handler, string & symbol) {
     mpVar->insert(make_pair(handler, symbol));
-//#ifdef DEBUG
-//    cout << "Registered Var " << symbol << " with handler " << handler << endl;
-//#endif
     LOG4CPLUS_DEBUG(logger,"Registered Var " << symbol << " with handler " << handler );
 }
 
@@ -180,9 +161,6 @@ const char * CudaDrHandler::GetVar(const char* handler) {
 
 // void CudaDrHandler::RegisterTexture(string& handler, textureReference* texref) {
 //     mpTexture->insert(make_pair(handler, texref));
-// //#ifdef DEBUG
-// //    cout << "Registered Texture " << texref << " with handler " << handler<< endl;
-// //#endif
 //     LOG4CPLUS_DEBUG(logger,"Registered Texture " << texref << " with handler " << handler);
 // }
 
@@ -224,7 +202,7 @@ const char *CudaDrHandler::GetSymbol(Buffer* in) {
 void CudaDrHandler::Initialize() {
     if (mspHandlers != NULL)
         return;
-    mspHandlers = new map<string, CudaDrHandler::CudaDriverHandler > ();
+    mspHandlers = new map<string, CudaDrHandler::CudaDriverHandler>();
 
     /*CudaDrHAndler_initialization*/
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(Init));
@@ -238,10 +216,10 @@ void CudaDrHandler::Initialize() {
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(CtxPopCurrent));
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(CtxPushCurrent));
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(CtxSynchronize));
-
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(CtxDisablePeerAccess));
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(CtxEnablePeerAccess));
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(DeviceCanAccessPeer));
+    mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(DevicePrimaryCtxGetState));
 
     /*CudaDrHandler_device*/
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(DeviceComputeCapability));
@@ -292,7 +270,6 @@ void CudaDrHandler::Initialize() {
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(ModuleLoadFatBinary));
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(ModuleUnload));
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(ModuleGetTexRef));
-
 
     /*CudaDrHandler_version*/
     mspHandlers->insert(CUDA_DRIVER_HANDLER_PAIR(DriverGetVersion));

@@ -30,6 +30,5 @@ using namespace std;
 CudaDrFrontend msInstance __attribute_used__;
 
 CudaDrFrontend::CudaDrFrontend() {
-    Frontend::GetFrontend();
+    gvirtus::frontend::Frontend::GetFrontend();
 }
-

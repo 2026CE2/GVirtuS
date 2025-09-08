@@ -24,11 +24,7 @@
  */
 
 
-#include <cstring>
-#include "CudaDrFrontend.h"
-#include "CudaUtil.h"
 #include "CudaDr.h"
-#include <cuda.h>
 
 using namespace std;
 
@@ -38,5 +34,5 @@ extern CUresult cuDriverGetVersion(int *driverVersion) {
     CudaDrFrontend::Execute("cuDriverGetVersion");
     if (CudaDrFrontend::Success())
         *driverVersion = CudaDrFrontend::GetOutputVariable<int>();
-    return (CUresult) (CudaDrFrontend::GetExitCode());
+    return CudaDrFrontend::GetExitCode();
 }

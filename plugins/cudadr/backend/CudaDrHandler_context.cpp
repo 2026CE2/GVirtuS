@@ -23,13 +23,13 @@
  *             Department of Applied Science
  */
 
-#include <cuda.h>
 #include "CudaDrHandler.h"
-#include <driver_types.h>
-#include <stdio.h>
 
 using namespace std;
 using namespace log4cplus;
+
+using gvirtus::communicators::Buffer;
+using gvirtus::communicators::Result;
 
 /*Create a CUDA context*/
 CUDA_DRIVER_HANDLER(CtxCreate) {
@@ -125,3 +125,13 @@ CUDA_DRIVER_HANDLER(DeviceCanAccessPeer) {
     return std::make_shared<Result>((cudaError_t) exit_code, out);
 }
 
+CUDA_DRIVER_HANDLER(DevicePrimaryCtxGetState) {
+    CUdevice dev = input_buffer->Get<CUdevice>();
+    unsigned int flags;
+    int active;
+    CUresult exit_code = cuDevicePrimaryCtxGetState(dev, &flags, &active);
+    std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
+    out->Add(flags);
+    out->Add(active);
+    return std::make_shared<Result>(exit_code, out);
+}

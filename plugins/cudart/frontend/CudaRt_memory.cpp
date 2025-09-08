@@ -23,10 +23,6 @@
  *             Department of Applied Science
  */
 
-#include <string.h>
-#include <algorithm>
-#include <cstdio>
-#include <log4cplus/tchar.h>
 #include "CudaRt.h"
 
 #ifndef CUDART_VERSION
@@ -35,16 +31,21 @@
 
 using namespace std;
 using gvirtus::common::mappedPointer;
-using gvirtus::common::pointer_t;
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaMemGetInfo(size_t *free, size_t *total) {
+    // cout << "cudaMemGetInfo called" << endl;
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::Execute("cudaMemGetInfo");
+    if (CudaRtFrontend::Success()) {
+        *free = *CudaRtFrontend::GetOutputHostPointer<size_t>();
+        *total = *CudaRtFrontend::GetOutputHostPointer<size_t>();
+    }
+    return CudaRtFrontend::GetExitCode();
+}
 
 extern "C" __host__ cudaError_t CUDARTAPI cudaFree(void *devPtr) {
-
-    //printf("cudaFree: 0x%x\n", devPtr);
-
-
   if (CudaRtFrontend::isMappedMemory(devPtr)) {
       void *hostPointer = devPtr;
-      //printf("cudaFree: 0x%x is a mapped pointer!\n", hostPointer);
 
 #ifdef DEBUG
     cerr << "Mapped pointer detected" << endl;
@@ -52,9 +53,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaFree(void *devPtr) {
 
     mappedPointer remotePointer = CudaRtFrontend::getMappedPointer(devPtr);
 
-    //printf("cudaFree: 0x%x -> 0x%x!\n",devPtr,remotePointer.pointer);
-
-    free (devPtr);
+    free(devPtr);
     devPtr=remotePointer.pointer;
   }
 
@@ -72,9 +71,6 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaFreeArray(cudaArray *array) {
 }
 
 extern "C" __host__ cudaError_t CUDARTAPI cudaFreeHost(void *ptr) {
-#ifdef DEBUG
-  printf("Requesting cudaFreeHost\n");
-#endif
   free(ptr);
   return cudaSuccess;
 }
@@ -138,19 +134,17 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaHostGetFlags(unsigned int *pFlags,
 
 extern "C" __host__ cudaError_t CUDARTAPI cudaMalloc(void **devPtr,
                                                      size_t size) {
-  CudaRtFrontend::Prepare();
-  CudaRtFrontend::AddVariableForArguments(size);
-  CudaRtFrontend::Execute("cudaMalloc");
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddVariableForArguments(size);
+    // cout << "cudaMalloc frontend size: " << size << endl;
+    CudaRtFrontend::Execute("cudaMalloc");
 
-  if (CudaRtFrontend::Success()) {
-    *devPtr = CudaRtFrontend::GetOutputDevicePointer();
-#ifdef DEBUG
-    cout << "Adding Pointer" << endl;
-#endif
-    CudaRtFrontend::addDevicePointer(*devPtr);
-  }
-
-  return CudaRtFrontend::GetExitCode();
+    if (CudaRtFrontend::Success()) {
+        *devPtr = CudaRtFrontend::GetOutputDevicePointer();
+        // cout << "cudaMalloc frontend devPtr: " << *devPtr << endl;
+        CudaRtFrontend::addDevicePointer(*devPtr);
+    }
+    return CudaRtFrontend::GetExitCode();
 }
 
 extern "C" __host__ cudaError_t CUDARTAPI
@@ -160,18 +154,6 @@ cudaMalloc3D(cudaPitchedPtr *pitchedDevPtr, cudaExtent extent) {
   return cudaErrorUnknown;
 }
 
-//#if CUDART_VERSION >= 3000
-// extern "C" __host__ cudaError_t CUDARTAPI cudaMalloc3DArray(cudaArray
-// **array,
-//        const cudaChannelFormatDesc *desc,struct cudaExtent extent, unsigned
-//        int flags) {
-//#else
-// extern "C" __host__ cudaError_t CUDARTAPI cudaMalloc3DArray(cudaArray
-// **array,
-//       const cudaChannelFormatDesc *desc, cudaExtent extent, unsigned int
-//       flags) {
-//#endif
-
 extern "C" __host__ cudaError_t
 cudaMalloc3DArray(cudaArray_t *array, const cudaChannelFormatDesc *desc,
                   cudaExtent extent, unsigned int flags) {
@@ -180,63 +162,27 @@ cudaMalloc3DArray(cudaArray_t *array, const cudaChannelFormatDesc *desc,
   CudaRtFrontend::AddVariableForArguments(extent);
   CudaRtFrontend::AddVariableForArguments(flags);
 
-#ifdef DEBUG
-  printf("x %d\n", desc->x);
-  printf("y %d\n", desc->y);
-  printf("z %d\n", desc->z);
-  printf("w %d\n", desc->w);
-  printf("f %d\n", desc->f);
-
-  printf("width %d\n", extent.width);
-  printf("height %d\n", extent.height);
-  printf("depth %d\n", extent.depth);
-
-  printf("flags %d\n", flags);
-#endif
-
   CudaRtFrontend::Execute("cudaMalloc3DArray");
   if (CudaRtFrontend::Success())
     *array = *(CudaRtFrontend::GetOutputHostPointer<cudaArray_t>());
-  //*array = (cudaArray_t) CudaRtFrontend::GetOutputDevicePointer();
-
-  //    printf("%x\n", *array);
   return CudaRtFrontend::GetExitCode();
 }
 // FIXME: new mapping way
 
-#if CUDART_VERSION >= 3000
-
 extern "C" __host__ cudaError_t CUDARTAPI
 cudaMallocArray(cudaArray **arrayPtr, const cudaChannelFormatDesc *desc,
                 size_t width, size_t height, unsigned int flags) {
-#else
 
-extern "C" __host__ cudaError_t CUDARTAPI
-cudaMallocArray(cudaArray **arrayPtr, const cudaChannelFormatDesc *desc,
-                size_t width, size_t height) {
-#endif
   CudaRtFrontend::Prepare();
 
   CudaRtFrontend::AddHostPointerForArguments(desc);
   CudaRtFrontend::AddVariableForArguments(width);
   CudaRtFrontend::AddVariableForArguments(height);
 
-#ifdef DEBUG
-  printf("x %d\n", desc->x);
-  printf("y %d\n", desc->y);
-  printf("z %d\n", desc->z);
-  printf("w %d\n", desc->w);
-  printf("f %d\n", desc->f);
-
-  printf("width %d\n", width);
-  printf("height %d\n", height);
-#endif
-
   CudaRtFrontend::Execute("cudaMallocArray");
   if (CudaRtFrontend::Success())
     *arrayPtr = (cudaArray *)CudaRtFrontend::GetOutputDevicePointer();
 
-  //    printf("%x\n", *arrayPtr);
   return CudaRtFrontend::GetExitCode();
 }
 
@@ -293,7 +239,6 @@ extern "C" __host__ CUDARTAPI cudaError_t cudaMallocManaged(void **devPtr,
                                                             size_t size,
                                                             unsigned flags) {
 
-    //printf("MallocManaged: devPtr:%x size: %ld flags:%d\n",devPtr,size,flags);
     *devPtr = malloc(size);
 
     CudaRtFrontend::Prepare();
@@ -306,7 +251,6 @@ extern "C" __host__ CUDARTAPI cudaError_t cudaMallocManaged(void **devPtr,
 
 
         void *remotePointer = CudaRtFrontend::GetOutputDevicePointer();
-        //printf("MallocManaged: remotePointer: 0x%x\n",remotePointer);
 
         mappedPointer host;
         host.pointer = remotePointer;
@@ -315,7 +259,6 @@ extern "C" __host__ CUDARTAPI cudaError_t cudaMallocManaged(void **devPtr,
 #ifdef DEBUG
         cerr << "device: " << std::hex << hp << " host: " << *devPtr << endl;
 #endif
-        //printf("MallocManaged: *devPtr: 0x%x (local) -> hostPointer: 0x%x size: %ld flags:%d\n",devPtr, host.pointer,size);
         CudaRtFrontend::addMappedPointer(*devPtr, host);
     } else {
         free(*devPtr);
@@ -323,39 +266,6 @@ extern "C" __host__ CUDARTAPI cudaError_t cudaMallocManaged(void **devPtr,
 
     return CudaRtFrontend::GetExitCode();
 }
-
-/*
-
-extern "C" __host__ CUDARTAPI cudaError_t cudaMallocManaged(void **devPtr,
-                                                            size_t size,
-                                                            unsigned flags) {
-
-    printf("MallocManaged: devPtr:%x size: %ld flags:%d\n",devPtr,size,flags);
-
-    CudaRtFrontend::Prepare();
-    CudaRtFrontend::AddVariableForArguments(size);
-    CudaRtFrontend::Execute("cudaMalloc");
-
-    if (CudaRtFrontend::Success()) {
-
-        void *devicePointer = CudaRtFrontend::GetOutputDevicePointer();
-
-        *devPtr = malloc(size);
-
-        mappedPointer device;
-        device.pointer = devicePointer;
-        device.size = size;
-
-#ifdef DEBUG
-        cerr << "device: " << std::hex << hp << " host: " << *devPtr << endl;
-#endif
-        printf("MallocManaged: 0x%x (host) -> 0x%x (device)\n",*devPtr,device.pointer);
-        CudaRtFrontend::addMappedPointer(*devPtr, device);
-  }
-
-  return CudaRtFrontend::GetExitCode();
-}
-*/
 
 extern "C" __host__ cudaError_t CUDARTAPI
 cudaMemcpy3D(const cudaMemcpy3DParms *p) {
@@ -368,16 +278,11 @@ cudaMemcpy3D(const cudaMemcpy3DParms *p) {
   unsigned int cubemap_size = width * width * num_faces;
   unsigned int size =
       cubemap_size * num_layers * (p->srcPtr.pitch / p->extent.width);
-  //    unsigned int size = cubemap_size * num_layers * sizeof(float);
-  // float *h_data = (float *) malloc(size);
 
   CudaRtFrontend::AddHostPointerForArguments<char>(
       static_cast<char *>(const_cast<void *>(p->srcPtr.ptr)), size);
   CudaRtFrontend::Execute("cudaMemcpy3D");
   if (CudaRtFrontend::Success()) {
-    // memmove(p, CudaRtFrontend::GetOutputHostPointer<cudaMemcpy3DParms>(),
-    //         sizeof(cudaMemcpy3DParms));
-    //*p = *(CudaRtFrontend::GetOutputHostPointer<cudaMemcpy3DParms>());
     return CudaRtFrontend::GetExitCode();
   }
   return CudaRtFrontend::GetExitCode();
@@ -637,67 +542,58 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemcpyAsync(void *dst,
                                                           size_t count,
                                                           cudaMemcpyKind kind,
                                                           cudaStream_t stream) {
-  CudaRtFrontend::Prepare();
-  switch (kind) {
-    case cudaMemcpyDefault:
-    case cudaMemcpyHostToHost:
-      /* NOTE: no communication is performed, because it's just overhead
-       * here */
-      CudaRtFrontend::AddHostPointerForArguments("");
-      CudaRtFrontend::AddHostPointerForArguments("");
-      CudaRtFrontend::AddVariableForArguments(kind);
-#if CUDART_VERSION >= 3010
-      CudaRtFrontend::AddDevicePointerForArguments(stream);
-#else
-      CudaRtFrontend::AddVariableForArguments(stream);
-#endif
-      CudaRtFrontend::Execute("cudaMemcpyAsync");
-      if (memmove(dst, src, count) == NULL) return cudaErrorInvalidValue;
-      return cudaSuccess;
-      break;
-    case cudaMemcpyHostToDevice:
-      CudaRtFrontend::AddDevicePointerForArguments(dst);
-      CudaRtFrontend::AddHostPointerForArguments<char>(
-          static_cast<char *>(const_cast<void *>(src)), count);
-      CudaRtFrontend::AddVariableForArguments(count);
-      CudaRtFrontend::AddVariableForArguments(kind);
-#if CUDART_VERSION >= 3010
-      CudaRtFrontend::AddDevicePointerForArguments(stream);
-#else
-      CudaRtFrontend::AddVariableForArguments(stream);
-#endif
-      CudaRtFrontend::Execute("cudaMemcpyAsync");
-      break;
-    case cudaMemcpyDeviceToHost:
-      /* NOTE: adding a fake host pointer */
-      CudaRtFrontend::AddHostPointerForArguments("");
-      CudaRtFrontend::AddDevicePointerForArguments(src);
-      CudaRtFrontend::AddVariableForArguments(count);
-      CudaRtFrontend::AddVariableForArguments(kind);
-#if CUDART_VERSION >= 3010
-      CudaRtFrontend::AddDevicePointerForArguments(stream);
-#else
-      CudaRtFrontend::AddVariableForArguments(stream);
-#endif
-      CudaRtFrontend::Execute("cudaMemcpyAsync");
-      if (CudaRtFrontend::Success())
-        memmove(dst, CudaRtFrontend::GetOutputHostPointer<char>(count), count);
-      break;
-    case cudaMemcpyDeviceToDevice:
-      CudaRtFrontend::AddDevicePointerForArguments(dst);
-      CudaRtFrontend::AddDevicePointerForArguments(src);
-      CudaRtFrontend::AddVariableForArguments(count);
-      CudaRtFrontend::AddVariableForArguments(kind);
-#if CUDART_VERSION >= 3010
-      CudaRtFrontend::AddDevicePointerForArguments(stream);
-#else
-      CudaRtFrontend::AddVariableForArguments(stream);
-#endif
-      CudaRtFrontend::Execute("cudaMemcpyAsync");
-      break;
-  }
-
-  return CudaRtFrontend::GetExitCode();
+    CudaRtFrontend::Prepare();
+    // cout << "cudaMemcpyAsync frontend: "
+    //      << "dst: " << dst << ", src: " << src << ", count: " << count
+    //      << ", kind: " << kind << ", stream: " << stream << endl;
+    switch (kind) {
+        case cudaMemcpyDefault:
+        case cudaMemcpyHostToHost:
+            /* NOTE: no communication is performed, because it's just overhead
+            * here */
+            CudaRtFrontend::AddHostPointerForArguments("");
+            CudaRtFrontend::AddHostPointerForArguments("");
+            CudaRtFrontend::AddVariableForArguments(kind);
+            CudaRtFrontend::AddDevicePointerForArguments(stream);
+            CudaRtFrontend::Execute("cudaMemcpyAsync");
+            if (memmove(dst, src, count) == NULL) {
+                return cudaErrorInvalidValue;
+            }
+            return cudaSuccess;
+            break;
+        case cudaMemcpyHostToDevice:
+            // cout << "cudaMemcpyAsync HostToDevice" << endl;
+            CudaRtFrontend::AddDevicePointerForArguments(dst);
+            CudaRtFrontend::AddHostPointerForArguments<char>(
+                static_cast<char *>(const_cast<void *>(src)), count);
+            CudaRtFrontend::AddVariableForArguments(count);
+            CudaRtFrontend::AddVariableForArguments(kind);
+            CudaRtFrontend::AddDevicePointerForArguments(stream);
+            CudaRtFrontend::Execute("cudaMemcpyAsync");
+            break;
+        case cudaMemcpyDeviceToHost:
+            // cout << "cudaMemcpyAsync DeviceToHost" << endl;
+            /* NOTE: adding a fake host pointer */
+            CudaRtFrontend::AddHostPointerForArguments("");
+            CudaRtFrontend::AddDevicePointerForArguments(src);
+            CudaRtFrontend::AddVariableForArguments(count);
+            CudaRtFrontend::AddVariableForArguments(kind);
+            CudaRtFrontend::AddDevicePointerForArguments(stream);
+            CudaRtFrontend::Execute("cudaMemcpyAsync");
+            if (CudaRtFrontend::Success()) {
+                memmove(dst, CudaRtFrontend::GetOutputHostPointer<char>(count), count);
+            }
+            break;
+        case cudaMemcpyDeviceToDevice:
+            CudaRtFrontend::AddDevicePointerForArguments(dst);
+            CudaRtFrontend::AddDevicePointerForArguments(src);
+            CudaRtFrontend::AddVariableForArguments(count);
+            CudaRtFrontend::AddVariableForArguments(kind);
+            CudaRtFrontend::AddDevicePointerForArguments(stream);
+            CudaRtFrontend::Execute("cudaMemcpyAsync");
+            break;
+    }
+    return CudaRtFrontend::GetExitCode();
 }
 
 extern "C" __host__ cudaError_t CUDARTAPI
@@ -946,20 +842,59 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemset2D(void *devPtr,
                                                        size_t pitch, int value,
                                                        size_t width,
                                                        size_t height) {
-  CudaRtFrontend::Prepare();
-  CudaRtFrontend::AddDevicePointerForArguments(devPtr);
-  CudaRtFrontend::AddVariableForArguments(pitch);
-  CudaRtFrontend::AddVariableForArguments(value);
-  CudaRtFrontend::AddVariableForArguments(width);
-  CudaRtFrontend::AddVariableForArguments(height);
-  CudaRtFrontend::Execute("cudaMemset2D");
-  // TO-DO si deve fare sul serio solo la parte di backend ovviamente
-  return CudaRtFrontend::GetExitCode();
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(devPtr);
+    CudaRtFrontend::AddVariableForArguments(pitch);
+    CudaRtFrontend::AddVariableForArguments(value);
+    CudaRtFrontend::AddVariableForArguments(width);
+    CudaRtFrontend::AddVariableForArguments(height);
+    CudaRtFrontend::Execute("cudaMemset2D");
+    // TO-DO si deve fare sul serio solo la parte di backend ovviamente
+    return CudaRtFrontend::GetExitCode();
 }
 
 extern "C" __host__ cudaError_t CUDARTAPI
 cudaMemset3D(cudaPitchedPtr pitchDevPtr, int value, cudaExtent extent) {
-  // FIXME: implement
-  cerr << "*** Error: cudaMemset3D() not yet implemented!" << endl;
-  return cudaErrorUnknown;
+    // FIXME: implement
+    cerr << "*** Error: cudaMemset3D() not yet implemented!" << endl;
+    return cudaErrorUnknown;
+}
+
+// TODO: needs testing
+extern "C" __host__ cudaError_t CUDARTAPI cudaHostRegister(void *ptr, size_t size,
+                                                        unsigned int flags) {
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddHostPointerForArguments(ptr);
+    CudaRtFrontend::AddVariableForArguments(size);
+    CudaRtFrontend::AddVariableForArguments(flags);
+    CudaRtFrontend::Execute("cudaHostRegister");
+    if (CudaRtFrontend::Success()) {
+        mappedPointer host;
+        host.pointer = ptr;
+        host.size = size;
+        CudaRtFrontend::addMappedPointer(ptr, host);
+    }
+    return CudaRtFrontend::GetExitCode();
+}
+
+// TODO: needs testing
+extern "C" __host__ cudaError_t CUDARTAPI cudaHostUnregister(void* ptr) {
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(ptr);
+    CudaRtFrontend::Execute("cudaHostUnregister");
+    return CudaRtFrontend::GetExitCode();
+}
+
+// TODO: needs testing
+extern "C" __host__ cudaError_t CUDARTAPI cudaPointerGetAttributes(
+    cudaPointerAttributes *attributes, const void *ptr) {
+    cout << "cudaPointerGetAttributes frontend" << endl;
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddHostPointerForArguments(attributes);
+    CudaRtFrontend::AddHostPointerForArguments(ptr);
+    CudaRtFrontend::Execute("cudaPointerGetAttributes");
+    if (CudaRtFrontend::Success()) {
+        *attributes = *(CudaRtFrontend::GetOutputHostPointer<cudaPointerAttributes>());
+    }
+    return CudaRtFrontend::GetExitCode();
 }

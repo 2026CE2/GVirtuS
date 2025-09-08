@@ -15,13 +15,6 @@
  * nodes.
  */
 
-#include <cstdlib> /* getenv */
-#include <unistd.h>
-#include <algorithm>
-#include <iostream>
-#include <memory>
-#include <string>
-
 #include "gvirtus/backend/Backend.h"
 #include "gvirtus/backend/Property.h"
 
@@ -72,8 +65,8 @@ int main(int argc, char **argv) {
     catch (std::string & exc) {
         LOG4CPLUS_ERROR(logger, "✖ - Exception:" << exc);
     }
-    catch (const char * exc) {
-        LOG4CPLUS_ERROR(logger, "✖ - Exception:" << exc);
+    catch (const std::exception& e) {
+        LOG4CPLUS_ERROR(logger, "✖ - Exception:" << e.what());
     }
 
     LOG4CPLUS_INFO(logger, "🛈  - [Process " << getpid() << "] Shutdown");

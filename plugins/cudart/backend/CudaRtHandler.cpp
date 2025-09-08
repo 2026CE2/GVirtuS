@@ -32,298 +32,161 @@
  *
  *
  */
-//#define DEBUG
-#include "CudaRtHandler.h"
-#include "CudaUtil.h"
 
-#include <cstring>
-#include <cuda_runtime_api.h>
-#include <dlfcn.h>
+#include "CudaRtHandler.h"
 
 using namespace std;
 using namespace log4cplus;
 
-map<string, CudaRtHandler::CudaRoutineHandler> *CudaRtHandler::mspHandlers =
-    NULL;
+map<string, CudaRtHandler::CudaRoutineHandler> *CudaRtHandler::mspHandlers = NULL;
 
 extern "C" std::shared_ptr<CudaRtHandler> create_t() {
-  return std::make_shared<CudaRtHandler>();
+    return std::make_shared<CudaRtHandler>();
 }
 
 CudaRtHandler::CudaRtHandler() {
-  logger = Logger::getInstance(LOG4CPLUS_TEXT("CudaRtHandler"));
-  setLogLevel(&logger);
-  mpFatBinary = new map<string, void **>();
-  mpDeviceFunction = new map<string, string>();
-  mpVar = new map<string, string>();
-  mpTexture = new map<string, cudaTextureObject_t*>();
-  mpSurface = new map<string, cudaSurfaceObject_t*>();
+    logger = Logger::getInstance(LOG4CPLUS_TEXT("CudaRtHandler"));
+    setLogLevel(&logger);
+    mpFatBinary = new map<string, void **>();
+    mpDeviceFunction = new map<string, string>();
+    mpVar = new map<string, string>();
+    mpTexture = new map<string, cudaTextureObject_t*>();
+    mpSurface = new map<string, cudaSurfaceObject_t*>();
 
-  mapHost2DeviceFunc = new map<const void*, std::string>();
-  mapDeviceFunc2InfoFunc = new map<std::string, NvInfoFunction>();
-  Initialize();
+    mapHost2DeviceFunc = new map<const void*, std::string>();
+    mapDeviceFunc2InfoFunc = new map<std::string, NvInfoFunction>();
+    Initialize();
 }
 
 CudaRtHandler::~CudaRtHandler() {}
 
 void CudaRtHandler::setLogLevel(Logger *logger) {
-  log4cplus::LogLevel logLevel = log4cplus::INFO_LOG_LEVEL;
-  char *val = getenv("GVIRTUS_LOGLEVEL");
-  std::string logLevelString =
-      (val == NULL ? std::string("") : std::string(val));
-  if (logLevelString != "") {
-    logLevel = std::stoi(logLevelString);
-  }
-  logger->setLogLevel(logLevel);
+    log4cplus::LogLevel logLevel = log4cplus::INFO_LOG_LEVEL;
+    char *val = getenv("GVIRTUS_LOGLEVEL");
+    std::string logLevelString = (val == NULL ? std::string("") : std::string(val));
+    if (logLevelString != "") {
+        logLevel = std::stoi(logLevelString);
+    }
+    logger->setLogLevel(logLevel);
 }
-
 
 bool CudaRtHandler::CanExecute(std::string routine) {
-  map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
-  it = mspHandlers->find(routine);
-  if (it == mspHandlers->end()) return false;
-  return true;
+    map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
+    it = mspHandlers->find(routine);
+    if (it == mspHandlers->end()) return false;
+    return true;
 }
-
-
-
-// Gives the proof even after both input(header.first) and output(routine) same but still it fails to runs
-
-// bool CudaRtHandler::CanExecute(std::string routine) {
-//   // Trim the input routine and handler
-//   std::cout << "Checking if routine exists: '" << routine << "'" << std::endl;
-
-//   // Debug: Print all the routines stored in mspHandlers
-//   //std::cout << "Registered routines in mspHandlers:" << std::endl;
-
-//   for (auto& handler : *mspHandlers) {
-//       // std::cout << " - " << handler.first << std::endl;
-
-//       if (handler.first == "cudaRegisterFatBinary") {
-//         std::cout << "Registered routines in mspHandlers and passing routine are same:" << std::endl;
-
-//         if (routine == "cudaRegisterFatBinary") {
-//           std::cout << " routine name is same as cudaRegisterFatBinary" << std::endl;
-//         }
-//         else {
-//           std::cout << "routine name is not same as cudaRegisterFatBinary" << std::endl;
-
-//           std::cout << "routine name is "<< routine << std::endl;
-//         }
-//       }
-//   }
-//   map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
-//   it = mspHandlers->find(routine);
-  
-//   if (it == mspHandlers->end()) {
-//       std::cout << "Routine not found in handlers: " << routine << std::endl;
-//       return false;
-//   }
-  
-//   std::cout << "Routine found: " << routine << std::endl;
-//   return true;
-// }
-
-
-
-
-// This works--------------- After removing some null characters but throws string error
-// bool CudaRtHandler::CanExecute(std::string routine) {
-//   std::cout << "Checking if routine exists: '" << routine << "'" << std::endl;
-
-//   try {
-//       // Trim trailing null characters (if any)
-//       routine.erase(std::find(routine.begin(), routine.end(), '\0'), routine.end());
-
-//       std::cout << "Checking routine after trimming: '" << routine << "'" << std::endl;
-
-//       // Check if routine exists in mspHandlers
-//       map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
-//       it = mspHandlers->find(routine);
-
-//       if (it == mspHandlers->end()) {
-//           std::cout << "Routine not found in handlers: " << routine << std::endl;
-//           return false;
-//       }
-
-//       std::cout << "Routine found: " << routine << std::endl;
-//       return true;
-
-//   } catch (const std::exception &e) {
-//       std::cerr << "Exception caught in CanExecute: " << e.what() << std::endl;
-//       return false;
-//   } catch (...) {
-//       std::cerr << "Unknown exception caught in CanExecute" << std::endl;
-//       return false;
-//   }
-// }
-
-
-
-//Comparision work
-
-// bool CudaRtHandler::CanExecute(std::string routine) {
-//   std::cout << "Checking if routine exists: " << routine << std::endl;
-
-//   // Remove trailing null characters (ASCII: 0) from the routine string
-//   routine.erase(std::find(routine.begin(), routine.end(), '\0'), routine.end());
-
-//   // Log the length and ASCII value of each character in the string
-//   for (char c : routine) {
-//       std::cout << "Routine char: " << c << " ASCII: " << int(c) << std::endl;
-//   }
-
-//   for (auto& handler : *mspHandlers) {
-//       // std::cout << " - " << handler.first << std::endl;
-
-//       if (handler.first == "cudaRegisterFatBinary") {
-//         std::cout << "Registered routines in mspHandlers and passing routine are same:" << std::endl;
-
-//       for (char c : handler.first) {
-//       std::cout << "handler.firstchar: " << c << " ASCII: " << int(c) << std::endl;
-//       }
-
-//       }
-//   }
-
-//   map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
-//   it = mspHandlers->find(routine);
-
-//   if (it == mspHandlers->end()) {
-//       std::cout << "Routine not found in handlers: " << routine << std::endl;
-//       return false;
-//   }
-
-//   std::cout << "Routine found: " << routine << std::endl;
-//   return true;
-// }
-
-
 
 std::shared_ptr<Result> CudaRtHandler::Execute(
     std::string routine, std::shared_ptr<Buffer> input_buffer) {
-  map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
-  it = mspHandlers->find(routine);
-  LOG4CPLUS_DEBUG(logger, "Called: " << routine);
-  if (it == mspHandlers->end()) throw runtime_error("No handler for '" + routine + "' found!");
-  return it->second(this, input_buffer);
+    map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
+    it = mspHandlers->find(routine);
+    LOG4CPLUS_DEBUG(logger, "Called: " << routine);
+    if (it == mspHandlers->end()) throw runtime_error("No handler for '" + routine + "' found!");
+    return it->second(this, input_buffer);
 }
 
 void CudaRtHandler::RegisterFatBinary(std::string &handler,
                                       void **fatCubinHandle) {
-  map<string, void **>::iterator it = mpFatBinary->find(handler);
-  if (it != mpFatBinary->end()) {
-    mpFatBinary->erase(it);
-  }
-  mpFatBinary->insert(make_pair(handler, fatCubinHandle));
-  //#ifdef DEBUG
-  //    cout << "Registered FatBinary " << fatCubinHandle << " with handler " <<
-  //    handler << endl;
-  //#endif
-  LOG4CPLUS_DEBUG(logger, "Registered FatBinary "
-                              << fatCubinHandle << " with handler " << handler);
+    map<string, void **>::iterator it = mpFatBinary->find(handler);
+    if (it != mpFatBinary->end()) {
+        mpFatBinary->erase(it);
+    }
+    mpFatBinary->insert(make_pair(handler, fatCubinHandle));
+    LOG4CPLUS_DEBUG(logger, "Registered FatBinary "
+                            << fatCubinHandle << " with handler " << handler);
 }
 
 void CudaRtHandler::RegisterFatBinary(const char *handler,
                                       void **fatCubinHandle) {
-  string tmp(handler);
-  RegisterFatBinary(tmp, fatCubinHandle);
+    string tmp(handler);
+    RegisterFatBinary(tmp, fatCubinHandle);
 }
 
 void **CudaRtHandler::GetFatBinary(string &handler) {
-  map<string, void **>::iterator it = mpFatBinary->find(handler);
-  if (it == mpFatBinary->end()) throw runtime_error("Fat Binary '" + handler + "' not found");
-  return it->second;
+    map<string, void **>::iterator it = mpFatBinary->find(handler);
+    if (it == mpFatBinary->end()) throw runtime_error("Fat Binary '" + handler + "' not found");
+    return it->second;
 }
 
 void **CudaRtHandler::GetFatBinary(const char *handler) {
-  string tmp(handler);
-  return GetFatBinary(tmp);
+    string tmp(handler);
+    return GetFatBinary(tmp);
 }
 
 void CudaRtHandler::UnregisterFatBinary(std::string &handler) {
-  map<string, void **>::iterator it = mpFatBinary->find(handler);
-  if (it == mpFatBinary->end()) return;
-  /* FIXME: think about freeing memory */
-  //#ifdef DEBUG
-  //    cout << "Unregistered FatBinary " << it->second << " with handler "<<
-  //    handler << endl;
-  //#endif
-  LOG4CPLUS_DEBUG(logger, "Unregistered FatBinary "
-                              << it->second << " with handler " << handler);
-  mpFatBinary->erase(it);
+    map<string, void **>::iterator it = mpFatBinary->find(handler);
+    if (it == mpFatBinary->end()) return;
+    /* FIXME: think about freeing memory */
+    LOG4CPLUS_DEBUG(logger, "Unregistered FatBinary "
+                                << it->second << " with handler " << handler);
+    mpFatBinary->erase(it);
 }
 
 void CudaRtHandler::UnregisterFatBinary(const char *handler) {
-  string tmp(handler);
-  UnregisterFatBinary(tmp);
+    string tmp(handler);
+    UnregisterFatBinary(tmp);
 }
 
 void CudaRtHandler::RegisterDeviceFunction(std::string &handler,
                                            std::string &function) {
-  map<string, string>::iterator it = mpDeviceFunction->find(handler);
-  if (it != mpDeviceFunction->end()) mpDeviceFunction->erase(it);
-  mpDeviceFunction->insert(make_pair(handler, function));
-  //#ifdef DEBUG
-  //    cout << "Registered DeviceFunction " << function << " with handler " <<
-  //    handler << endl;
-  //#endif
-  LOG4CPLUS_DEBUG(logger, "Registered DeviceFunction "
-                              << function << " with handler " << handler);
+    map<string, string>::iterator it = mpDeviceFunction->find(handler);
+    if (it != mpDeviceFunction->end()) mpDeviceFunction->erase(it);
+    mpDeviceFunction->insert(make_pair(handler, function));
+    LOG4CPLUS_DEBUG(logger, "Registered DeviceFunction "
+                                << function << " with handler " << handler);
 }
 
 void CudaRtHandler::RegisterDeviceFunction(const char *handler,
                                            const char *function) {
-  string tmp1(handler);
-  string tmp2(function);
-  RegisterDeviceFunction(tmp1, tmp2);
+    string tmp1(handler);
+    string tmp2(function);
+    RegisterDeviceFunction(tmp1, tmp2);
 }
 
 const char *CudaRtHandler::GetDeviceFunction(std::string &handler) {
-  map<string, string>::iterator it = mpDeviceFunction->find(handler);
-  if (it == mpDeviceFunction->end())
-    throw runtime_error("Device Function '" + handler + "' not found");
-  return it->second.c_str();
+    map<string, string>::iterator it = mpDeviceFunction->find(handler);
+    if (it == mpDeviceFunction->end())
+        throw runtime_error("Device Function '" + handler + "' not found");
+    return it->second.c_str();
 }
 
 const char *CudaRtHandler::GetDeviceFunction(const char *handler) {
-  string tmp(handler);
-  return GetDeviceFunction(tmp);
+    string tmp(handler);
+    return GetDeviceFunction(tmp);
 }
 
 void CudaRtHandler::RegisterVar(string &handler, string &symbol) {
-  mpVar->insert(make_pair(handler, symbol));
-  //#ifdef DEBUG
-  //    cout << "Registered Var " << symbol << " with handler " << handler <<
-  //    endl;
-  //#endif
-  LOG4CPLUS_DEBUG(logger,
-                  "Registered Var " << symbol << " with handler " << handler);
+    logger = Logger::getInstance(LOG4CPLUS_TEXT("RegisterVar"));
+    LOG4CPLUS_DEBUG(logger, "Registering Var " << symbol
+                                << " with handler " << handler);
+    mpVar->insert(make_pair(handler, symbol));
+    LOG4CPLUS_DEBUG(logger,
+                    "Registered Var " << symbol << " with handler " << handler);
 }
 
 void CudaRtHandler::RegisterVar(const char *handler, const char *symbol) {
-  string tmp1(handler);
-  string tmp2(symbol);
-  RegisterVar(tmp1, tmp2);
+    logger = Logger::getInstance(LOG4CPLUS_TEXT("RegisterVar"));
+    LOG4CPLUS_DEBUG(logger, "Registering Var " << symbol
+                                << " with handler " << handler);
+    string tmp1(handler);
+    string tmp2(symbol);
+    RegisterVar(tmp1, tmp2);
 }
 
 const char *CudaRtHandler::GetVar(string &handler) {
-  map<string, string>::iterator it = mpVar->find(handler);
-  if (it == mpVar->end()) return NULL;
-  return it->second.c_str();
+    map<string, string>::iterator it = mpVar->find(handler);
+    if (it == mpVar->end()) return NULL;
+    return it->second.c_str();
 }
 
 const char *CudaRtHandler::GetVar(const char *handler) {
-  string tmp(handler);
-  return GetVar(tmp);
+    string tmp(handler);
+    return GetVar(tmp);
 }
 
 // void CudaRtHandler::RegisterTexture(string &handler, cudaTextureObject_t* texref) {
 //   mpTexture->insert(make_pair(handler, texref));
-//   //#ifdef DEBUG
-//   //    cout << "Registered Texture " << texref << " with handler " << handler<<
-//   //    endl;
-//   //#endif
 //   LOG4CPLUS_DEBUG(
 //       logger, "Registered Texture " << texref << " with handler " << handler);
 // }
@@ -337,10 +200,6 @@ const char *CudaRtHandler::GetVar(const char *handler) {
 // void CudaRtHandler::RegisterSurface(string &handler,
 //                                     cudaSurfaceObject_t* surfref) {
 //   mpSurface->insert(make_pair(handler, surfref));
-//   //#ifdef DEBUG
-//   //    cout << "Registered Surface " << surfref << " with handler " <<
-//   //    handler<< endl;
-//   //#endif
 //   LOG4CPLUS_DEBUG(
 //       logger, "Registered Surface " << surfref << " with handler " << handler);
 // }
@@ -396,17 +255,8 @@ const char *CudaRtHandler::GetSymbol(std::shared_ptr<Buffer> in) {
 }
 
 void CudaRtHandler::Initialize() {
-  if (mspHandlers != NULL)  return;
+  if (mspHandlers != NULL) return;
   mspHandlers = new map<string, CudaRtHandler::CudaRoutineHandler>();
-
-  std::cout << "Initializing CudaRtHandler..." << std::endl;  // Debug log
-
-  mspHandlers = new map<string, CudaRtHandler::CudaRoutineHandler>();
-  // Insert routines...
-  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterFatBinary));
-  // Log to verify it's inserted
-  std::cout << "Registered routine: cudaRegisterFatBinary" << std::endl;
-
 
   /* CudaRtHandler_device */
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(ChooseDevice));
@@ -425,8 +275,8 @@ void CudaRtHandler::Initialize() {
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(IpcGetEventHandle));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(IpcOpenEventHandle));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(IpcOpenMemHandle));
-  mspHandlers->insert(
-      CUDA_ROUTINE_HANDLER_PAIR(OccupancyMaxActiveBlocksPerMultiprocessor));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(OccupancyMaxActiveBlocksPerMultiprocessor));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(DeviceGetDefaultMemPool));
 #if (CUDART_VERSION >= 7000)
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(
       OccupancyMaxActiveBlocksPerMultiprocessorWithFlags));
@@ -488,10 +338,9 @@ void CudaRtHandler::Initialize() {
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterVar));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterSharedVar));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterShared));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterTexture));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterSurface));
 
   /* CudaRtHandler_memory */
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(MemGetInfo));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(Free));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(FreeArray));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GetSymbolAddress));
@@ -517,14 +366,19 @@ void CudaRtHandler::Initialize() {
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(MemcpyPeerAsync));
 
   /* CudaRtHandler_opengl */
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GLSetGLDevice)); // deprecated
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GLSetGLDevice)); // deprecated
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphicsGLRegisterBuffer));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphicsMapResources));
-  mspHandlers->insert(
-      CUDA_ROUTINE_HANDLER_PAIR(GraphicsResourceGetMappedPointer));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphicsResourceGetMappedPointer));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphicsUnmapResources));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphicsUnregisterResource));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphicsResourceSetMapFlags));
+
+  /* CudaRtHandler_stream_memory */
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(MemPoolCreate));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(MemPoolGetAttribute));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(MemPoolSetAttribute));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(MemPoolDestroy));
 
   /* CudaRtHandler_stream */
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(StreamCreate));
@@ -534,28 +388,8 @@ void CudaRtHandler::Initialize() {
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(StreamCreateWithFlags));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(StreamWaitEvent));
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(StreamCreateWithPriority));
-
-  // DEPRECATED
-  /* CudaRtHandler_surface */
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(BindSurfaceToArray));
-
-  /* CudaRtHandler_texture */
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(BindTexture));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(BindTexture2D));
-#ifndef CUDART_VERSION
-#error CUDART_VERSION not defined
-#endif
-  // DEPRECATED
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(BindTextureToArray));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(CreateTextureObject));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GetChannelDesc));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GetTextureAlignmentOffset));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GetTextureReference));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(UnbindTexture));
-
-  /* CudaRtHandler_thread */
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(ThreadExit));
-  // mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(ThreadSynchronize));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(ThreadExchangeStreamCaptureMode));
+  mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(StreamIsCapturing));
 
   /* CudaRtHandler_version */
 #ifndef CUDART_VERSION
@@ -567,4 +401,3 @@ void CudaRtHandler::Initialize() {
   mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(FuncSetCacheConfig));
 #endif
 }
-

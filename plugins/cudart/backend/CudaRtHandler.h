@@ -51,26 +51,15 @@
 #include <unistd.h>
 
 #include <cuda_runtime_api.h>
+#include <CudaRt_internal.h>
+#include <CudaUtil.h>
 
 #include <gvirtus/backend/Handler.h>
 #include <gvirtus/communicators/Result.h>
-#include "CudaUtil.h"
 
 #include "log4cplus/configurator.h"
 #include "log4cplus/logger.h"
 #include "log4cplus/loggingmacros.h"
-
-#include "../3rdparty/include/CudaRt_internal.h"
-
-#if (CUDART_VERSION >= 9020)
-#if (CUDART_VERSION >= 11000)
-#define __CUDACC__
-// #define cudaPushCallConfiguration __cudaPushCallConfiguration
-#endif
-// #include "crt/device_functions.h"
-#endif
-
-//#define DEBUG
 
 /**
  * CudaRtHandler is used by Backend's Process(es) for storing and retrieving
@@ -112,37 +101,31 @@ class CudaRtHandler : public gvirtus::backend::Handler {
   const char *GetVar(std::string &handler);
   const char *GetVar(const char *handler);
 
-// textures and surfaces have become obsolete
-//   void RegisterTexture(std::string &handler, cudaTextureObject_t *texref);
-//   void RegisterTexture(const char *handler, cudaTextureObject_t *texref);
-//   void RegisterSurface(std::string &handler, cudaSurfaceObject_t *surref);
-//   void RegisterSurface(const char *handler, cudaSurfaceObject_t *surref);
-//   cudaTextureObject_t* GetTexture(std::string &handler);
-//   cudaTextureObject_t* GetTexture(pointer_t handler);
-//   cudaTextureObject_t* GetTexture(const char *handler);
-//   const char *GetTextureHandler(cudaTextureObject_t *texref);
-//   cudaSurfaceObject_t*GetSurface(std::string &handler);
-//   cudaSurfaceObject_t*GetSurface(pointer_t handler);
-//   cudaSurfaceObject_t*GetSurface(const char *handler);
-//   const char *GetSurfaceHandler(cudaSurfaceObject_t *texref);
-
   const char *GetSymbol(std::shared_ptr<Buffer> in);
 
   static void setLogLevel(Logger *logger);
 
-     inline void addDeviceFunc2InfoFunc(std::string deviceFunc, NvInfoFunction infoFunction) {
+    inline void addDeviceFunc2InfoFunc(std::string deviceFunc, NvInfoFunction infoFunction) {
         mapDeviceFunc2InfoFunc->insert(make_pair(deviceFunc, infoFunction));
     }
 
-     inline NvInfoFunction getInfoFunc(std::string deviceFunc) {
+    inline NvInfoFunction getInfoFunc(std::string deviceFunc) {
+        if (mapDeviceFunc2InfoFunc->find(deviceFunc) == mapDeviceFunc2InfoFunc->end()) {
+            LOG4CPLUS_ERROR(logger, "getInfoFunc: device function '" << deviceFunc << "' not found");
+            throw std::runtime_error("getInfoFunc: device function not found");
+        }
         return mapDeviceFunc2InfoFunc->find(deviceFunc)->second;
     };
 
-     inline void addHost2DeviceFunc(void* hostFunc, std::string deviceFunc) {
+    inline void addHost2DeviceFunc(const void* hostFunc, std::string deviceFunc) {
         mapHost2DeviceFunc->insert(make_pair(hostFunc, deviceFunc));
     }
 
-     inline std::string getDeviceFunc(void *hostFunc) {
+    inline std::string getDeviceFunc(const void *hostFunc) {
+        if (mapHost2DeviceFunc->find(hostFunc) == mapHost2DeviceFunc->end()) {
+            LOG4CPLUS_ERROR(logger, "getDeviceFunc: host function '" << hostFunc << "' not found");
+            throw std::runtime_error("getDeviceFunc: host function not found");
+        }
         return mapHost2DeviceFunc->find(hostFunc)->second;
     };
 
@@ -164,25 +147,22 @@ class CudaRtHandler : public gvirtus::backend::Handler {
         }
     }
  private:
-  log4cplus::Logger logger;
-  void Initialize();
-  typedef std::shared_ptr<Result> (*CudaRoutineHandler)(
-      CudaRtHandler *, std::shared_ptr<Buffer>);
-  static std::map<std::string, CudaRoutineHandler> *mspHandlers;
-  std::map<std::string, void **> *mpFatBinary;
-  std::map<std::string, std::string> *mpDeviceFunction;
-  std::map<std::string, std::string> *mpVar;
-  std::map<std::string, cudaTextureObject_t*> *mpTexture;
-  std::map<std::string, cudaSurfaceObject_t*> *mpSurface;
-  map<std::string, NvInfoFunction>* mapDeviceFunc2InfoFunc;
-  map<const void *,std::string>* mapHost2DeviceFunc;
-  void *mpShm;
-  int mShmFd;
+    log4cplus::Logger logger;
+    void Initialize();
+    typedef std::shared_ptr<Result> (*CudaRoutineHandler)(CudaRtHandler *, std::shared_ptr<Buffer>);
+    static std::map<std::string, CudaRoutineHandler> *mspHandlers;
+    std::map<std::string, void **> *mpFatBinary;
+    std::map<std::string, std::string> *mpDeviceFunction;
+    std::map<std::string, std::string> *mpVar;
+    std::map<std::string, cudaTextureObject_t*> *mpTexture;
+    std::map<std::string, cudaSurfaceObject_t*> *mpSurface;
+    map<std::string, NvInfoFunction>* mapDeviceFunc2InfoFunc;
+    map<const void *,std::string>* mapHost2DeviceFunc;
+    void *mpShm;
+    int mShmFd;
 };
 
-#define CUDA_ROUTINE_HANDLER(name)                           \
-  std::shared_ptr<Result> handle##name(CudaRtHandler *pThis, \
-                                       std::shared_ptr<Buffer> input_buffer)
+#define CUDA_ROUTINE_HANDLER(name) std::shared_ptr<Result> handle##name(CudaRtHandler *pThis, std::shared_ptr<Buffer> input_buffer)
 #define CUDA_ROUTINE_HANDLER_PAIR(name) make_pair("cuda" #name, handle##name)
 
 /* CudaRtHandler_device */
@@ -204,6 +184,7 @@ CUDA_ROUTINE_HANDLER(IpcGetMemHandle);
 CUDA_ROUTINE_HANDLER(IpcGetEventHandle);
 CUDA_ROUTINE_HANDLER(IpcOpenEventHandle);
 CUDA_ROUTINE_HANDLER(IpcOpenMemHandle);
+CUDA_ROUTINE_HANDLER(DeviceGetDefaultMemPool);
 // Testing
 CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessor);
 CUDA_ROUTINE_HANDLER(DeviceGetAttribute);
@@ -229,15 +210,15 @@ CUDA_ROUTINE_HANDLER(FuncGetAttributes);
 CUDA_ROUTINE_HANDLER(FuncSetCacheConfig);
 CUDA_ROUTINE_HANDLER(Launch);
 #if CUDART_VERSION >= 9000
-CUDA_ROUTINE_HANDLER(LaunchKernel);
+    CUDA_ROUTINE_HANDLER(LaunchKernel);
 #endif
 CUDA_ROUTINE_HANDLER(SetDoubleForDevice);
 CUDA_ROUTINE_HANDLER(SetDoubleForHost);
 CUDA_ROUTINE_HANDLER(SetupArgument);
 
 #if CUDART_VERSION >= 9020
-CUDA_ROUTINE_HANDLER(PushCallConfiguration);
-CUDA_ROUTINE_HANDLER(PopCallConfiguration);
+    CUDA_ROUTINE_HANDLER(PushCallConfiguration);
+    CUDA_ROUTINE_HANDLER(PopCallConfiguration);
 #endif
 
 /* CudaRtHandler_internal */
@@ -248,12 +229,11 @@ CUDA_ROUTINE_HANDLER(RegisterFunction);
 CUDA_ROUTINE_HANDLER(RegisterVar);
 CUDA_ROUTINE_HANDLER(RegisterSharedVar);
 CUDA_ROUTINE_HANDLER(RegisterShared);
-// CUDA_ROUTINE_HANDLER(RegisterTexture);
-// CUDA_ROUTINE_HANDLER(RegisterSurface);
 CUDA_ROUTINE_HANDLER(RegisterSharedMemory);
 CUDA_ROUTINE_HANDLER(RequestSharedMemory);
 
 /* CudaRtHandler_memory */
+CUDA_ROUTINE_HANDLER(MemGetInfo);
 CUDA_ROUTINE_HANDLER(Free);
 CUDA_ROUTINE_HANDLER(FreeArray);
 CUDA_ROUTINE_HANDLER(GetSymbolAddress);
@@ -279,13 +259,19 @@ CUDA_ROUTINE_HANDLER(Malloc3DArray);
 CUDA_ROUTINE_HANDLER(MemcpyPeerAsync);
 
 /* CudaRtHandler_opengl */
-// CUDA_ROUTINE_HANDLER(GLSetGLDevice); // deprecated
+CUDA_ROUTINE_HANDLER(GLSetGLDevice);
 CUDA_ROUTINE_HANDLER(GraphicsGLRegisterBuffer);
 CUDA_ROUTINE_HANDLER(GraphicsMapResources);
 CUDA_ROUTINE_HANDLER(GraphicsResourceGetMappedPointer);
 CUDA_ROUTINE_HANDLER(GraphicsUnmapResources);
 CUDA_ROUTINE_HANDLER(GraphicsUnregisterResource);
 CUDA_ROUTINE_HANDLER(GraphicsResourceSetMapFlags);
+
+/* CudaRtHandler_stream_memory */
+CUDA_ROUTINE_HANDLER(MemPoolCreate);
+CUDA_ROUTINE_HANDLER(MemPoolGetAttribute);
+CUDA_ROUTINE_HANDLER(MemPoolSetAttribute);
+CUDA_ROUTINE_HANDLER(MemPoolDestroy);
 
 /* CudaRtHandler_stream */
 CUDA_ROUTINE_HANDLER(StreamCreate);
@@ -295,27 +281,8 @@ CUDA_ROUTINE_HANDLER(StreamSynchronize);
 CUDA_ROUTINE_HANDLER(StreamCreateWithFlags);
 CUDA_ROUTINE_HANDLER(StreamWaitEvent);
 CUDA_ROUTINE_HANDLER(StreamCreateWithPriority);
-
-// DEPRECATED
-/* CudaRtHandler_texture */ 
-// CUDA_ROUTINE_HANDLER(BindTexture);
-// CUDA_ROUTINE_HANDLER(BindTexture2D);
-// CUDA_ROUTINE_HANDLER(BindTextureToArray);
-// CUDA_ROUTINE_HANDLER(CreateTextureObject);
-// CUDA_ROUTINE_HANDLER(GetChannelDesc);
-// CUDA_ROUTINE_HANDLER(GetTextureAlignmentOffset);
-// CUDA_ROUTINE_HANDLER(GetTextureReference);
-// CUDA_ROUTINE_HANDLER(UnbindTexture);
-
-// DEPRECATED
-/* CudaRtHandler_surface */
-// CUDA_ROUTINE_HANDLER(BindSurfaceToArray);
-// CUDA_ROUTINE_HANDLER(GetTextureReference);
-
-// DEPRECATED
-/* CudaRtHandler_thread */
-// CUDA_ROUTINE_HANDLER(ThreadExit);
-// CUDA_ROUTINE_HANDLER(ThreadSynchronize);
+CUDA_ROUTINE_HANDLER(ThreadExchangeStreamCaptureMode);
+CUDA_ROUTINE_HANDLER(StreamIsCapturing);
 
 /* CudaRtHandler_version */
 CUDA_ROUTINE_HANDLER(DriverGetVersion);
@@ -324,7 +291,7 @@ CUDA_ROUTINE_HANDLER(RuntimeGetVersion);
 /* Occupancy */
 CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessor);
 #if (CUDART_VERSION >= 7000)
-CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessorWithFlags);
+    CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessorWithFlags);
 #endif
 
 #endif /* _CUDARTHANDLER_H */

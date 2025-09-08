@@ -22,26 +22,21 @@
  * Written by: Giuseppe Coviello <vincenzo.santopietro@uniparthenope.it>,
  *             Department of Science and Technologies
  */
+ 
+ #include "CublasHandler.h"
 
-#include "CublasHandler.h"
-#include <iostream>
-#include <cstdio>
-#include <string>
-
-using namespace std;
-using namespace log4cplus;
-
+using gvirtus::communicators::Buffer;
+using gvirtus::communicators::Result;
 
 CUBLAS_ROUTINE_HANDLER(Sgemv_v2){
     Logger logger=Logger::getInstance(LOG4CPLUS_TEXT("Sgemv"));
     
     cublasHandle_t handle;
-    handle = (cublasHandle_t) in->Get<long long int>();
+    handle = in->Get<cublasHandle_t>();
     cublasOperation_t trans = in->Get<cublasOperation_t>();
     int m  = in->Get<int>();
     int n  = in->Get<int>();
     const float * alpha = in->Assign<float>();
-    //cout << "alpha: "<<*alpha<<endl;
     float * A = in->GetFromMarshal<float*>();
     int lda = in->Get<int>();
     float * x = in->GetFromMarshal<float*>();
@@ -50,36 +45,21 @@ CUBLAS_ROUTINE_HANDLER(Sgemv_v2){
     const float * beta = in->Assign<float>();
     float * y = in->GetFromMarshal<float*>();
     int incy = in->Get<int>();
-    cublasStatus_t cs;
-        std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
 
-    try{
-        cs = cublasSgemv_v2(handle,trans,m,n,alpha,A,lda,x,incx,beta,y,incy);
-        if (cs == CUBLAS_STATUS_INVALID_VALUE)
-            cout<<"invalid value"<<endl;
-        if (cs == CUBLAS_STATUS_ARCH_MISMATCH)
-            cout<<"arch mismatch"<<endl;
-        if( cs == CUBLAS_STATUS_EXECUTION_FAILED)
-            cout<<"Execution failed"<<endl;
-        out->AddMarshal<float *>(y);
-    } catch (string e){
-        LOG4CPLUS_DEBUG(logger,e);
-        return std::make_shared<Result>(cudaErrorMemoryAllocation);
-    }
-    //cout << "DEBUG - cublasSgemv_v2 Executed"<<endl;
-    return std::make_shared<Result>(cs,out);
+    cublasStatus_t cs = cublasSgemv_v2(handle, trans, m, n, alpha, A, lda, x, incx, beta, y, incy);
+    LOG4CPLUS_DEBUG(logger, "cublasSgemv_v2 Executed");
+    return std::make_shared<Result>(cs);
 }
 
 CUBLAS_ROUTINE_HANDLER(Dgemv_v2){
     Logger logger=Logger::getInstance(LOG4CPLUS_TEXT("Dgemv"));
     
     cublasHandle_t handle;
-    handle = (cublasHandle_t) in->Get<long long int>();
+    handle = in->Get<cublasHandle_t>();
     cublasOperation_t trans = in->Get<cublasOperation_t>();
     int m  = in->Get<int>();
     int n  = in->Get<int>();
     const double * alpha = in->Assign<double>();
-    cout << "alpha: "<<*alpha<<endl;
     double * A = in->GetFromMarshal<double*>();
     int lda = in->Get<int>();
     double * x = in->GetFromMarshal<double*>();
@@ -88,24 +68,10 @@ CUBLAS_ROUTINE_HANDLER(Dgemv_v2){
     const double * beta = in->Assign<double>();
     double * y = in->GetFromMarshal<double*>();
     int incy = in->Get<int>();
-    cublasStatus_t cs;
-        std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
 
-    try{
-        cs = cublasDgemv_v2(handle,trans,m,n,alpha,A,lda,x,incx,beta,y,incy);
-        if (cs == CUBLAS_STATUS_INVALID_VALUE)
-            cout<<"invalid value"<<endl;
-        if (cs == CUBLAS_STATUS_ARCH_MISMATCH)
-            cout<<"arch mismatch"<<endl;
-        if( cs == CUBLAS_STATUS_EXECUTION_FAILED)
-            cout<<"Execution failed"<<endl;
-        out->AddMarshal<double *>(y);
-    } catch (string e){
-        LOG4CPLUS_DEBUG(logger,e);
-        return std::make_shared<Result>(cudaErrorMemoryAllocation);
-    }
-    cout << "DEBUG - cublasDgemv_v2 Executed"<<endl;
-    return std::make_shared<Result>(cs,out);
+    cublasStatus_t cs = cublasDgemv_v2(handle, trans, m, n, alpha, A, lda, x, incx, beta, y, incy);
+    LOG4CPLUS_DEBUG(logger, "cublasDgemv_v2 Executed");
+    return std::make_shared<Result>(cs);
 }
 
 CUBLAS_ROUTINE_HANDLER(Cgemv_v2){
@@ -130,18 +96,12 @@ CUBLAS_ROUTINE_HANDLER(Cgemv_v2){
 
     try{
         cs = cublasCgemv_v2(handle,trans,m,n,alpha,A,lda,x,incx,beta,y,incy);
-        if (cs == CUBLAS_STATUS_INVALID_VALUE)
-            cout<<"invalid value"<<endl;
-        if (cs == CUBLAS_STATUS_ARCH_MISMATCH)
-            cout<<"arch mismatch"<<endl;
-        if( cs == CUBLAS_STATUS_EXECUTION_FAILED)
-            cout<<"Execution failed"<<endl;
         out->AddMarshal<cuComplex *>(y);
-    } catch (string e){
-        LOG4CPLUS_DEBUG(logger,e);
+    } catch (const std::exception& e) {
+        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
         return std::make_shared<Result>(cudaErrorMemoryAllocation);
     }
-    cout << "DEBUG - cublasCgemv_v2 Executed"<<endl;
+    LOG4CPLUS_DEBUG(logger, "cublasCgemv_v2 Executed");
     return std::make_shared<Result>(cs,out);
 }
 
@@ -168,18 +128,12 @@ CUBLAS_ROUTINE_HANDLER(Zgemv_v2){
 
     try{
         cs = cublasZgemv_v2(handle,trans,m,n,alpha,A,lda,x,incx,beta,y,incy);
-        if (cs == CUBLAS_STATUS_INVALID_VALUE)
-            cout<<"invalid value"<<endl;
-        if (cs == CUBLAS_STATUS_ARCH_MISMATCH)
-            cout<<"arch mismatch"<<endl;
-        if( cs == CUBLAS_STATUS_EXECUTION_FAILED)
-            cout<<"Execution failed"<<endl;
         out->AddMarshal<cuDoubleComplex *>(y);
-    } catch (string e){
-        LOG4CPLUS_DEBUG(logger,e);
+    } catch (const std::exception& e) {
+        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
         return std::make_shared<Result>(cudaErrorMemoryAllocation);
     }
-    cout << "DEBUG - cublasZgemv_v2 Executed"<<endl;
+    LOG4CPLUS_DEBUG(logger, "cublasZgemv_v2 Executed");
     return std::make_shared<Result>(cs,out);
 }
 

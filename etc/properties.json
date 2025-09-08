@@ -4,17 +4,19 @@
       "endpoint": {
         "suite": "tcp/ip",
         "protocol": "tcp",
-        "server_address": "127.0.0.1",
+        "server_address": "192.168.0.236",
         "port": "9999"
       },
       "plugins": [
+        "cuda",
         "cudart",
         "cublas",
         "curand",
         "cudnn",
         "cufft",
         "cusolver",
-        "cusparse"
+        "cusparse",
+        "nvrtc"
       ]
     }
   ],
