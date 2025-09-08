@@ -15,6 +15,8 @@ message(STATUS "Found cuDNN header: ${CUDNN_INCLUDE_DIRECTORY}")
 
 include_directories(${CUDNN_INCLUDE_DIRECTORY} ${CUDA_INCLUDE_DIRS})
 
+get_filename_component(CUDA_LIBRARIES_PATH ${CUDA_CUDART_LIBRARY} DIRECTORY FALSE)
+
 # Find cuDNN library
 find_library(CUDNN_LIBRARY
     cudnn
@@ -35,6 +37,9 @@ endwhile()
 string(REGEX REPLACE ".*\\.so\\.([0-9]+\\.[0-9]+\\.[0-9]+)" "\\1" CUDNN_VERSION "${CUDNN_VERSION}")
 
 message(STATUS "Found cuDNN: ${CUDNN_VERSION} (${CUDNN_INCLUDE_DIRECTORY}/cudnn.h, ${CUDNN_LIBRARY})")
+
+gvirtus_add_backend(cudnn ${CUDNN_VERSION}
+        backend/CudnnHandler.cpp)
 
 # Add backend and frontend
 gvirtus_add_backend(cudnn ${CUDNN_VERSION} backend/CudnnHandler.cpp)
