@@ -41,8 +41,7 @@ namespace gvirtus::communicators {
                                                         "http",
                                                         "oldtcp",
                                                         "ws",
-                                                        "ib",
-                                                        "roce"
+                                                        "ib"
             };
 
             // Supported secure communicators
