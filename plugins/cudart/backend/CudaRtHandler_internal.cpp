@@ -200,7 +200,7 @@ void parseNvInfoSections(const Elf64_Ehdr *eh, Elf64_Shdr *sh_table, char *sh_st
 
 CUDA_ROUTINE_HANDLER(RegisterFatBinary) {
     Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("RegisterFatBinary"));
-    LOG4CPLUS_DEBUG(logger, "Entering in RegisterFatBinary");
+//    LOG4CPLUS_DEBUG(logger, "Entering in RegisterFatBinary");
 
     try {
         char *handler = input_buffer->AssignString();
@@ -385,7 +385,7 @@ CUDA_ROUTINE_HANDLER(RegisterVar) {
         __cudaRegisterVar(fatCubinHandle, hostVar, deviceAddress, deviceName, ext,
                         size, constant, global);
         cudaError_t error = cudaGetLastError();
-        LOG4CPLUS_DEBUG(logger, "RegisterVar Executed");
+        //LOG4CPLUS_DEBUG(logger, "RegisterVar Executed");
         if (error != cudaSuccess) {
             LOG4CPLUS_DEBUG(logger, "error executing RegisterVar: " << _cudaGetErrorEnum(error));
         }
