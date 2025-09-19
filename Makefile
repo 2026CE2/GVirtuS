@@ -1,4 +1,4 @@
-.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test
+.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-human-parsing-test
 
 docker-build-push-dev:
 	docker buildx build \
@@ -77,3 +77,30 @@ run-openpose-test:
 
 stop-openpose-test:
 	docker stop openpose_test_container || true
+
+
+
+docker-build-2d-human-parsing:
+	docker buildx build \
+		--platform linux/amd64 \
+		--push \
+		--no-cache \
+		-f examples/2d-human-parsing/Dockerfile \
+		-t darsh916/human-parsing_gvirtus:cuda12.6 \
+		examples/2d-human-parsing	
+
+
+run-2d-human-parsing-test: 
+	docker run --rm \
+		--name human_parsing_test_container \
+		--network host \
+		--shm-size=8G \
+		-v ./examples/2d-human-parsing/inference_acc_00.py:/opt/2D-Human-Parsing/inference/inference_acc_00.py \
+		-v ./examples/2d-human-parsing/demo_imgs:/opt/2D-Human-Parsing/demo_imgs \
+		-v ./examples/2d-human-parsing/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/2d-human-parsing/entrypoint.sh:/entrypoint.sh \
+		darsh916/human-parsing_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+stop-2d-human-parsing-test:
+	docker stop human-parsing_test_container || true

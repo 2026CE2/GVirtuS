@@ -1,7 +1,7 @@
 FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-# ENV GVIRTUS_HOME=/opt/GVirtuS
+ENV GVIRTUS_HOME=/opt/GVirtuS
 ENV OPENPOSE_HOME=/opt/openpose
 # ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
 
@@ -50,34 +50,34 @@ RUN ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
 RUN pip3 install opencv-python
 
 # Clone and build GVirtuS
-# WORKDIR /opt
-# RUN git clone -b dev https://github.com/ecn-aau/GVirtuS.git && \
-#     cd GVirtuS && mkdir build && cd build && \
-#     cmake -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} .. && \
-#     make -j$(nproc) && make install
+WORKDIR /opt
+RUN git clone -b dev https://github.com/ecn-aau/GVirtuS.git && \
+    cd GVirtuS && mkdir build && cd build && \
+    cmake -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} .. && \
+    make -j$(nproc) && make install
 
 # Clone and build OpenPose
 WORKDIR /opt
 RUN git clone --depth=1 https://github.com/CMU-Perceptual-Computing-Lab/openpose.git
 
 # Copy custom Cuda.cmake
-# COPY cmake/Cuda.cmake ${OPENPOSE_HOME}/cmake/Cuda.cmake
+COPY cmake/Cuda.cmake ${OPENPOSE_HOME}/cmake/Cuda.cmake
 
 # Copy patched Caffe (after OpenPose clone)
-# COPY caffe/ ${OPENPOSE_HOME}/3rdparty/caffe/
+COPY caffe/ ${OPENPOSE_HOME}/3rdparty/caffe/
 
 # Optional: Copy models directory if needed
 # COPY models/ ${OPENPOSE_HOME}/models/
 
-# WORKDIR ${OPENPOSE_HOME}/build
+WORKDIR ${OPENPOSE_HOME}/build
 RUN cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_CAFFE=ON \
     -DBUILD_EXAMPLES=ON .. && \
-#     # -DBUILD_DOCS=OFF \
-#     # -DCUDA_USE_STATIC_CUDA_RUNTIME=OFF \
-#     # -D BUILD_TESTS=OFF \
-#     # -D CUDA_USE_STATIC_CUDA_RUNTIME=OFF \
-#     # -D CUDA_INCLUDE_DIRS="${GVIRTUS_HOME}/include;/usr/local/cuda-12.6/include" \
-#     # -D CMAKE_CXX_FLAGS="-L${GVIRTUS_HOME}/lib -L${GVIRTUS_HOME}/lib/frontend" ..&& \
-#     make -j12
+    -DBUILD_DOCS=OFF \
+    -DCUDA_USE_STATIC_CUDA_RUNTIME=OFF \
+    -D BUILD_TESTS=OFF \
+    -D CUDA_USE_STATIC_CUDA_RUNTIME=OFF \
+    -D CUDA_INCLUDE_DIRS="${GVIRTUS_HOME}/include;/usr/local/cuda-12.6/include" \
+    -D CMAKE_CXX_FLAGS="-L${GVIRTUS_HOME}/lib -L${GVIRTUS_HOME}/lib/frontend" ..&& \
+    make -j$(nproc)
