@@ -73,11 +73,11 @@ WORKDIR ${OPENPOSE_HOME}/build
 RUN cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_CAFFE=ON \
-    -DBUILD_EXAMPLES=ON .. && \
+    -DBUILD_EXAMPLES=ON \
     -DBUILD_DOCS=OFF \
+    -DBUILD_TESTS=OFF \
     -DCUDA_USE_STATIC_CUDA_RUNTIME=OFF \
-    -D BUILD_TESTS=OFF \
-    -D CUDA_USE_STATIC_CUDA_RUNTIME=OFF \
-    -D CUDA_INCLUDE_DIRS="${GVIRTUS_HOME}/include;/usr/local/cuda-12.6/include" \
-    -D CMAKE_CXX_FLAGS="-L${GVIRTUS_HOME}/lib -L${GVIRTUS_HOME}/lib/frontend" ..&& \
-    make -j$(nproc)
+    -DCUDA_INCLUDE_DIRS="${GVIRTUS_HOME}/include;/usr/local/cuda-12.6/include" \
+    -DCMAKE_CXX_FLAGS="-L${GVIRTUS_HOME}/lib -L${GVIRTUS_HOME}/lib/frontend" \
+    && make -j"$(nproc)"
+
