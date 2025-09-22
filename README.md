@@ -35,7 +35,7 @@ Before proceeding, ensure the following dependencies are installed on your syste
 1) `git clone` the **GVirtuS** main repository: 
 
 ```   
-git clone -b dev https://github.com/ecn-aau/GVirtuS.git
+git clone https://github.com/ecn-aau/GVirtuS.git
 ```
 
 2) CD into the repo directory:
@@ -115,10 +115,10 @@ The below instructions explains how to set up and run **OpenPose integrated with
 
 ### 1. Clone the GVirtuS Repository
 
-Clone the development branch of the GVirtuS project:
+Clone the GVirtuS project:
 
 ```bash
-git clone -b dev https://github.com/ecn-aau/GVirtuS.git
+git clone https://github.com/ecn-aau/GVirtuS.git
 ```
 
 ### 2. Navigate into the Repository

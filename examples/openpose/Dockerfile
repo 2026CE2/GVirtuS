@@ -51,7 +51,7 @@ RUN pip3 install opencv-python
 
 # Clone and build GVirtuS
 WORKDIR /opt
-RUN git clone -b dev https://github.com/ecn-aau/GVirtuS.git && \
+RUN git clone https://github.com/ecn-aau/GVirtuS.git && \
     cd GVirtuS && mkdir build && cd build && \
     cmake -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} .. && \
     make -j$(nproc) && make install
