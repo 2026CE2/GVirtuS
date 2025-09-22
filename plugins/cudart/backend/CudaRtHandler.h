@@ -203,6 +203,7 @@ CUDA_ROUTINE_HANDLER(EventElapsedTime);
 CUDA_ROUTINE_HANDLER(EventQuery);
 CUDA_ROUTINE_HANDLER(EventRecord);
 CUDA_ROUTINE_HANDLER(EventSynchronize);
+CUDA_ROUTINE_HANDLER(EventRecordWithFlags);
 
 /* CudaRtHandler_execution */
 CUDA_ROUTINE_HANDLER(ConfigureCall);
@@ -257,6 +258,8 @@ CUDA_ROUTINE_HANDLER(Memcpy2DFromArray);
 CUDA_ROUTINE_HANDLER(Memcpy2DToArray);
 CUDA_ROUTINE_HANDLER(Malloc3DArray);
 CUDA_ROUTINE_HANDLER(MemcpyPeerAsync);
+CUDA_ROUTINE_HANDLER(HostRegister);
+CUDA_ROUTINE_HANDLER(HostUnregister);
 
 /* CudaRtHandler_opengl */
 CUDA_ROUTINE_HANDLER(GLSetGLDevice);
@@ -293,5 +296,8 @@ CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessor);
 #if (CUDART_VERSION >= 7000)
     CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessorWithFlags);
 #endif
+
+/* CudaRtHandler_api */
+CUDA_ROUTINE_HANDLER(FuncSetAttribute);
 
 #endif /* _CUDARTHANDLER_H */

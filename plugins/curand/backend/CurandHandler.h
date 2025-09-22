@@ -42,7 +42,7 @@ public:
     bool CanExecute(std::string routine);
     std::shared_ptr<gvirtus::communicators::Result> Execute(std::string routine,
         std::shared_ptr<gvirtus::communicators::Buffer> input_buffer);
-        
+
 private:
     log4cplus::Logger logger;
     void Initialize();
@@ -51,13 +51,14 @@ private:
     static std::map<std::string, CurandRoutineHandler> * mspHandlers;
 };
 
-#define CURAND_ROUTINE_HANDLER(name) std::shared_ptr<gvirtus::communicators::Result> handle##name(CurandHandler * pThis, std::shared_ptr<gvirtus::communicators::Buffer> in)
+#define CURAND_ROUTINE_HANDLER(name) std::shared_ptr<gvirtus::communicators::Result> handle##name(CurandHandler *pThis, std::shared_ptr<gvirtus::communicators::Buffer> in)
 #define CURAND_ROUTINE_HANDLER_PAIR(name) make_pair("curand" #name, handle##name)
 
 /* CurandHandler_Platform */
 CURAND_ROUTINE_HANDLER(CreateGenerator);
 CURAND_ROUTINE_HANDLER(CreateGeneratorHost);
 CURAND_ROUTINE_HANDLER(SetPseudoRandomGeneratorSeed);
+CURAND_ROUTINE_HANDLER(SetGeneratorOffset);
 CURAND_ROUTINE_HANDLER(SetQuasiRandomGeneratorDimensions);
 CURAND_ROUTINE_HANDLER(Generate);
 CURAND_ROUTINE_HANDLER(GenerateLongLong);
@@ -70,7 +71,4 @@ CURAND_ROUTINE_HANDLER(GenerateNormalDouble);
 CURAND_ROUTINE_HANDLER(GenerateLogNormalDouble);
 CURAND_ROUTINE_HANDLER(DestroyGenerator);
 
-CURAND_ROUTINE_HANDLER(SetGeneratorOffset);
-
 #endif //_CURANDHANDLER_H
-

@@ -21,10 +21,12 @@
  *
  */
 #include "CurandHandler.h"
-#include "CurandHandler_host.cpp"
 
 using namespace std;
 using namespace log4cplus;
+
+using gvirtus::communicators::Buffer;
+using gvirtus::communicators::Result;
 
 std::map<string, CurandHandler::CurandRoutineHandler> * CurandHandler::mspHandlers = NULL;
 
@@ -33,7 +35,7 @@ extern "C" std::shared_ptr<CurandHandler> create_t() {
 }
 
 CurandHandler::CurandHandler() {
-    logger=Logger::getInstance(LOG4CPLUS_TEXT("CurandHandler"));
+    logger = Logger::getInstance(LOG4CPLUS_TEXT("CurandHandler"));
     Initialize();
 }
 
@@ -45,7 +47,7 @@ bool CurandHandler::CanExecute(std::string routine) {
 }
 
 std::shared_ptr<Result> CurandHandler::Execute(std::string routine, std::shared_ptr<Buffer> in) {
-    LOG4CPLUS_DEBUG(logger,"Called " << routine);
+    LOG4CPLUS_DEBUG(logger, "Called " << routine);
     map<string, CurandHandler::CurandRoutineHandler>::iterator it;
     it = mspHandlers->find(routine);
     if (it == mspHandlers->end())
@@ -67,6 +69,7 @@ void CurandHandler::Initialize() {
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(CreateGenerator));
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(CreateGeneratorHost));
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(SetPseudoRandomGeneratorSeed));
+    mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(SetGeneratorOffset));
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(SetQuasiRandomGeneratorDimensions));
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(Generate));
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(GenerateLongLong));
@@ -78,6 +81,4 @@ void CurandHandler::Initialize() {
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(GenerateNormalDouble));
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(GenerateLogNormalDouble));
     mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(DestroyGenerator));
-    
-    mspHandlers->insert(CURAND_ROUTINE_HANDLER_PAIR(SetGeneratorOffset));
 }

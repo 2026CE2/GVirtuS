@@ -80,7 +80,16 @@ void Frontend::Init(Communicator *c) {
 
     // Set the logging level
     std::string logLevelString = getEnvVar("GVIRTUS_LOGLEVEL");
-    log4cplus::LogLevel logLevel = logLevelString.empty() ? log4cplus::INFO_LOG_LEVEL : std::stoi(logLevelString);
+    log4cplus::LogLevel logLevel = log4cplus::INFO_LOG_LEVEL;
+    if (!logLevelString.empty()) {
+        try {
+            logLevel = static_cast<log4cplus::LogLevel>(std::stoi(logLevelString));
+        } catch (const std::exception& e) {
+            std::cerr << "[GVIRTUS WARNING] Invalid GVIRTUS_LOGLEVEL value: '" << logLevelString
+                    << "'. Using default INFO_LOG_LEVEL. (" << e.what() << ")\n";
+            logLevel = log4cplus::INFO_LOG_LEVEL;
+        }
+    }
 
     logger.setLogLevel(logLevel);
 
@@ -115,12 +124,7 @@ void Frontend::Init(Communicator *c) {
     try {
         auto endpoint = EndpointFactory::get_endpoint(config_path);
 
-        std::cout << "Endpoint details: suite=" << endpoint->suite()
-          << ", protocol=" << endpoint->protocol()
-          << ", to_string=" << endpoint->to_string() << std::endl;
-
         mpFrontends->find(tid)->second->_communicator = CommunicatorFactory::get_communicator(endpoint);
-
         mpFrontends->find(tid)->second->_communicator->obj_ptr()->Connect();
     }
     catch (const std::exception& e) {
@@ -212,15 +216,8 @@ Frontend *Frontend::GetFrontend(Communicator *c) {
 
 void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
     if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
-    if (!strcmp(routine, "cudaLaunchKernel")) {
-        cout << "cudaLanuchKernel called" << endl;
-    }
-    // else if (strcmp(routine, "cudaRegisterFatBinary") &&
-    //     strcmp(routine, "cudaRegisterFatBinaryEnd") &&
-    //     strcmp(routine, "cudaUnregisterFatBinary") &&
-    //     strcmp(routine, "cudaRegisterFunction") &&
-    //     strcmp(routine, "cudaRegisterVar")) {
-    //     cout <<  "Executing routine: " << routine << endl;
+    // if (!strcmp(routine, "cudaLaunchKernel")) {
+    //     cout << "cudaLaunchKernel called" << endl;
     // }
     
     pid_t tid = syscall(SYS_gettid);
@@ -246,14 +243,21 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
     frontend->mpOutputBuffer->Reset();
 
     frontend->_communicator->obj_ptr()->Read((char *) &frontend->mExitCode, sizeof(int));
-    LOG4CPLUS_DEBUG(logger, "Routine '" << routine << "' returned code " << frontend->mExitCode);
-    // if (frontend->mExitCode != 0) {
-        // LOG4CPLUS_ERROR(logger, "Error executing routine '" << routine << "': exit code " << frontend->mExitCode);
-        // return;
+    LOG4CPLUS_DEBUG(logger, "Routine '" << routine << "' returned " << frontend->mExitCode);
+    // if (frontend->mExitCode != 0
+    //     && strcmp(routine, "cudnnGetVersion") != 0
+    //     && strcmp(routine, "cudnnGetErrorString") != 0
+    //     && strcmp(routine, "cusolverDnGetVersion") != 0
+    //     && strcmp(routine, "cudaGetErrorString") != 0
+    //     && strcmp(routine, "cudaGetErrorName") != 0
+    //     && strcmp(routine, "cusparseGetErrorString") != 0
+    //     && strcmp(routine, "nvrtcGetErrorString") != 0
+    // ) {
+    //     LOG4CPLUS_ERROR(logger, "Error executing routine '" << routine << "': exit code " << frontend->mExitCode);
+    //     return;
     // }
     double time_taken;
     frontend->_communicator->obj_ptr()->Read(reinterpret_cast<char *>(&time_taken), sizeof(time_taken));
-    // cout << "time taken: " << time_taken << endl;
     frontend->mRoutineExecutionTime += time_taken;
 
     start = steady_clock::now();

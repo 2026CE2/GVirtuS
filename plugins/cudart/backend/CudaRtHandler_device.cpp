@@ -24,20 +24,9 @@
  */
 
 #include "CudaRtHandler.h"
-#include <cuda.h>
 
 using namespace log4cplus;
-/*
-void setLogLevel(Logger *logger) {
-  log4cplus::LogLevel logLevel=log4cplus::INFO_LOG_LEVEL;
-  char * val = getenv("GVIRTUS_LOGLEVEL" );
-  std::string logLevelString=(val == NULL ? std::string("") : std::string(val));
-  if (logLevelString!="") {
-      logLevel=std::stoi(logLevelString);
-  }
-  logger->setLogLevel(logLevel);
-}
-*/
+
 CUDA_ROUTINE_HANDLER(DeviceSetCacheConfig) {
   Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("DeviceSetCacheConfig"));
   CudaRtHandler::setLogLevel(&logger);
@@ -243,7 +232,6 @@ CUDA_ROUTINE_HANDLER(GetDevice) {
   }
 }
 
-
 CUDA_ROUTINE_HANDLER(DeviceReset) {
   Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("DeviceReset"));
   CudaRtHandler::setLogLevel(&logger);
@@ -263,8 +251,6 @@ CUDA_ROUTINE_HANDLER(DeviceSynchronize) {
   return std::make_shared<Result>(exit_code);
 }
 
-
-
 CUDA_ROUTINE_HANDLER(GetDeviceCount) {
   Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("GetDeviceCount"));
   try {
@@ -278,31 +264,6 @@ CUDA_ROUTINE_HANDLER(GetDeviceCount) {
     return std::make_shared<Result>(cudaErrorMemoryAllocation);
   }
 }
-
-// CUDA_ROUTINE_HANDLER(GetDeviceCount) {
-//     Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("GVirtuS"));
-//     CudaRtHandler::setLogLevel(&logger);
-
-//     try {
-//         int *countPtr = input_buffer->Assign<int>();
-
-//         CUresult cuRes = cuInit(0);
-//         if (cuRes == CUDA_SUCCESS)
-//             cuRes = cuDeviceGetCount(countPtr);  // write directly to input ptr
-
-//         std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
-//         out->Add(*countPtr);  // return the actual device count
-
-//         return std::make_shared<Result>(
-//             (cuRes == CUDA_SUCCESS) ? cudaSuccess : cudaErrorNotSupported,
-//             out);
-//     } catch (const std::exception& e) {
-//         LOG4CPLUS_DEBUG(logger, e.what());
-//         return std::make_shared<Result>(cudaErrorMemoryAllocation);
-//     }
-// }
-
-
 
 CUDA_ROUTINE_HANDLER(GetDeviceProperties) {
   Logger logger = Logger::getInstance(LOG4CPLUS_TEXT("GetDeviceProperties"));
@@ -337,8 +298,6 @@ CUDA_ROUTINE_HANDLER(SetDevice) {
     return std::make_shared<Result>(cudaErrorMemoryAllocation);
   }
 }
-
-
 
 #ifndef CUDART_VERSION
 #error CUDART_VERSION not defined

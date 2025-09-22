@@ -1,4 +1,4 @@
-.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-push-openpose run-openpose-frontend
+.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-human-parsing-test
 
 docker-build-push-dev:
 	docker buildx build \
@@ -6,7 +6,7 @@ docker-build-push-dev:
 		--push \
 		--no-cache \
 		-f docker/dev/Dockerfile \
-		-t darsh916/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04 \
+		-t taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
 docker-build-push-prod:
@@ -15,7 +15,7 @@ docker-build-push-prod:
 		--push \
 		--no-cache \
 		-f docker/prod/Dockerfile \
-		-t darsh916/gvirtus:cuda12.6.3-cudnn-ubuntu22.04 \
+		-t taslanidis/gvirtus:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
 run-gvirtus-backend-dev:
@@ -36,41 +36,71 @@ run-gvirtus-backend-dev:
 		-v ./examples:/gvirtus/examples/ \
 		--entrypoint /entrypoint.sh \
 		--name gvirtus \
-		--runtime=nvidia \
-		darsh916/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04
+		--shm-size=8G \
+		taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04
 
+attach-gvirtus-bash:
+		docker exec -it gvirtus bash
 
 run-gvirtus-tests:
 	docker exec \
 		-it gvirtus \
 		bash -c \
 		'export LD_LIBRARY_PATH=$$GVIRTUS_HOME/lib/frontend:$$LD_LIBRARY_PATH && \
-		 cd /gvirtus/build/tests && ./test_cudnn'                  
+			cd /gvirtus/build && \
+			ctest --output-on-failure'
 
 stop-gvirtus:
 	docker stop gvirtus
 
 
-docker-build-push-openpose:
+docker-build-openpose:
 	docker buildx build \
 		--platform linux/amd64 \
 		--push \
 		--no-cache \
-		-f docker/openpose/Dockerfile \
+		-f examples/openpose/Dockerfile \
 		-t darsh916/openpose_gvirtus:cuda12.6 \
-		docker/openpose
+		examples/openpose	
 
-run-openpose-frontend:
-	xhost +local:root
-	docker run \
-		--rm \
-		-it \
-		--gpus all \
+
+run-openpose-test: 
+	docker run --rm \
+		--name openpose_test_container \
 		--network host \
-		--env DISPLAY=$$DISPLAY \
-		--env XAUTHORITY=/root/.Xauthority \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $$HOME/.Xauthority:/root/.Xauthority \
-		-v ./examples/openpose-gvirtus:/home/openpose/examples/openpose-gvirtus \
-		--name openpose-frontend \
-		darsh916/openpose_gvirtus:cuda12.6
+		-v ./examples/openpose/media:/opt/openpose/examples/media \
+		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
+		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
+		darsh916/openpose_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+stop-openpose-test:
+	docker stop openpose_test_container || true
+
+
+
+docker-build-2d-human-parsing:
+	docker buildx build \
+		--platform linux/amd64 \
+		--push \
+		--no-cache \
+		-f examples/2d-human-parsing/Dockerfile \
+		-t darsh916/human-parsing_gvirtus:cuda12.6 \
+		examples/2d-human-parsing	
+
+
+run-2d-human-parsing-test: 
+	docker run --rm \
+		--name human_parsing_test_container \
+		--network host \
+		--shm-size=8G \
+		-v ./examples/2d-human-parsing/inference_acc_00.py:/opt/2D-Human-Parsing/inference/inference_acc_00.py \
+		-v ./examples/2d-human-parsing/demo_imgs:/opt/2D-Human-Parsing/demo_imgs \
+		-v ./examples/2d-human-parsing/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/2d-human-parsing/entrypoint.sh:/entrypoint.sh \
+		darsh916/human-parsing_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+stop-2d-human-parsing-test:
+	docker stop human-parsing_test_container || true

@@ -27,13 +27,19 @@ Process::Process(std::shared_ptr<LD_Lib<Communicator, std::shared_ptr<Endpoint>>
     logger = log4cplus::Logger::getInstance(LOG4CPLUS_TEXT("Process"));
 
     // Set the logging level
-    log4cplus::LogLevel logLevel = log4cplus::INFO_LOG_LEVEL;
     char *val = getenv("GVIRTUS_LOGLEVEL");
 
     std::string logLevelString = (val == NULL ? std::string("") : std::string(val));
 
+    log4cplus::LogLevel logLevel = log4cplus::INFO_LOG_LEVEL;
     if (!logLevelString.empty()) {
-        logLevel = std::stoi(logLevelString);
+        try {
+            logLevel = static_cast<log4cplus::LogLevel>(std::stoi(logLevelString));
+        } catch (const std::exception& e) {
+            std::cerr << "[GVIRTUS WARNING] Invalid GVIRTUS_LOGLEVEL value: '" << logLevelString
+                    << "'. Using default INFO_LOG_LEVEL. (" << e.what() << ")\n";
+            logLevel = log4cplus::INFO_LOG_LEVEL;
+        }
     }
     logger.setLogLevel(logLevel);
 
@@ -117,7 +123,7 @@ void Process::Start() {
         std::shared_ptr<Buffer> input_buffer = std::make_shared<Buffer>();
 
         while (getstring(client_comm, routine)) {
-            LOG4CPLUS_DEBUG(logger, "Received routine " << routine);
+            // LOG4CPLUS_DEBUG(logger, "Received routine " << routine);
 
             input_buffer->Reset(client_comm);
 
@@ -131,7 +137,7 @@ void Process::Start() {
 
             std::shared_ptr<communicators::Result> result;
             if (h == nullptr) {
-                LOG4CPLUS_ERROR(logger, "[Process " << getpid() << "]: Requested unknown routine " << routine << ".");
+                LOG4CPLUS_ERROR(logger, "[Process " << getpid() << "]: Requested unknown routine '" << routine << "'.");
                 result = std::make_shared<communicators::Result>(-1, std::make_shared<Buffer>());
             } else {
                 // esegue la routine e salva il risultato in result
@@ -142,9 +148,7 @@ void Process::Start() {
 
             // scrive il risultato sul communicator
             result->Dump(client_comm);
-            if (result->GetExitCode() != 0 && routine.compare("cudaLaunch")) {
-                LOG4CPLUS_DEBUG(logger, "[Process " << getpid() << "]: Routine '" << routine << "' returned with exit code '" << result->GetExitCode() << "'.");
-            }
+            // LOG4CPLUS_DEBUG(logger, "[Process " << getpid() << "]: Routine '" << routine << "' returned " << result->GetExitCode() << ".");
         }
         Notify("process-ended");
     };
@@ -192,4 +196,3 @@ Process::~Process() {
     _handlers.clear();
     mPlugins.clear();
 }
-

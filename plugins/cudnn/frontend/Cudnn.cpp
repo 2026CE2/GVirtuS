@@ -35,6 +35,52 @@ static std::unordered_map<void*, bool> desc_is_float_map;
 
 // Helper Functions
 
+void printHex(const void* data, size_t length, const std::string& label) {
+    auto bytes = reinterpret_cast<const unsigned char*>(data);
+    std::cout << label << " (" << length << " bytes): ";
+    for (size_t i = 0; i < length; i++) {
+        printf("%02X ", bytes[i]);  // print each byte as two-digit hex
+        if ((i + 1) % 16 == 0) std::cout << std::endl << "   "; // break lines for readability
+    }
+    std::cout << std::endl;
+}
+
+size_t getCudnnTypeSize(cudnnBackendAttributeType_t type) {
+    switch (type) {
+        case CUDNN_TYPE_HANDLE:                return sizeof(cudnnHandle_t);
+        case CUDNN_TYPE_DATA_TYPE:             return sizeof(cudnnDataType_t);
+        case CUDNN_TYPE_BOOLEAN:               return sizeof(bool);
+        case CUDNN_TYPE_INT64:                 return sizeof(int64_t);
+        case CUDNN_TYPE_FLOAT:                 return sizeof(float);
+        case CUDNN_TYPE_DOUBLE:                return sizeof(double);
+        case CUDNN_TYPE_VOID_PTR:              return sizeof(void*);
+        case CUDNN_TYPE_CONVOLUTION_MODE:      return sizeof(cudnnConvolutionMode_t);
+        case CUDNN_TYPE_HEUR_MODE:             return sizeof(cudnnBackendHeurMode_t);
+        case CUDNN_TYPE_KNOB_TYPE:             return sizeof(cudnnBackendKnobType_t);
+        case CUDNN_TYPE_NAN_PROPOGATION:       return sizeof(cudnnNanPropagation_t);
+        case CUDNN_TYPE_NUMERICAL_NOTE:        return sizeof(cudnnBackendNumericalNote_t);
+        case CUDNN_TYPE_LAYOUT_TYPE:           return sizeof(cudnnBackendLayoutType_t);
+        case CUDNN_TYPE_ATTRIB_NAME:           return sizeof(cudnnBackendAttributeName_t);
+        case CUDNN_TYPE_POINTWISE_MODE:        return sizeof(cudnnPointwiseMode_t);
+        case CUDNN_TYPE_BACKEND_DESCRIPTOR:    return sizeof(cudnnBackendDescriptor_t);
+        case CUDNN_TYPE_GENSTATS_MODE:         return sizeof(cudnnGenStatsMode_t);
+        case CUDNN_TYPE_BN_FINALIZE_STATS_MODE:return sizeof(cudnnBnFinalizeStatsMode_t);
+        case CUDNN_TYPE_REDUCTION_OPERATOR_TYPE:return sizeof(cudnnReduceTensorOp_t);
+        case CUDNN_TYPE_BEHAVIOR_NOTE:         return sizeof(cudnnBackendBehaviorNote_t);
+        case CUDNN_TYPE_TENSOR_REORDERING_MODE:return sizeof(cudnnBackendTensorReordering_t);
+        case CUDNN_TYPE_RESAMPLE_MODE:         return sizeof(cudnnResampleMode_t);
+        case CUDNN_TYPE_PADDING_MODE:          return sizeof(cudnnPaddingMode_t);
+        case CUDNN_TYPE_INT32:                 return sizeof(int32_t);
+        case CUDNN_TYPE_CHAR:                  return sizeof(char);
+        case CUDNN_TYPE_SIGNAL_MODE:           return sizeof(cudnnSignalMode_t);
+        case CUDNN_TYPE_FRACTION:              return sizeof(cudnnFraction_t);
+        case CUDNN_TYPE_NORM_MODE:             return sizeof(cudnnBackendNormMode_t);
+        case CUDNN_TYPE_NORM_FWD_PHASE:        return sizeof(cudnnBackendNormFwdPhase_t);
+        case CUDNN_TYPE_RNG_DISTRIBUTION:      return sizeof(cudnnRngDistribution_t);
+        default: return 0;
+    }
+}
+
 // Generic setter (used when you create a descriptor)
 void registerDescriptorType(void* desc, const cudnnDataType_t dataType) {
     std::lock_guard<std::mutex> lock(desc_type_mutex);
@@ -64,6 +110,17 @@ extern "C" const char * CUDNNWINAPI cudnnGetErrorString(cudnnStatus_t status) {
     return CudnnFrontend::GetOutputString();
 }
 
+extern "C" void CUDNNWINAPI cudnnGetLastErrorString(char *message, size_t max_size) {
+    CudnnFrontend::Prepare();
+    CudnnFrontend::AddVariableForArguments<size_t>(max_size);
+    CudnnFrontend::Execute("cudnnGetLastErrorString");
+    if (CudnnFrontend::Success()) {
+        message = CudnnFrontend::GetOutputString();
+        // this is safe because cuda promises to always return a null-terminated string
+        // even if the message is longer than max_size
+    }
+}
+
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateTensorDescriptor(cudnnTensorDescriptor_t *tensorDesc) {
     CudnnFrontend::Prepare();
 
@@ -74,7 +131,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateTensorDescriptor(cudnnTensorDesc
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensor4dDescriptor( cudnnTensorDescriptor_t   tensorDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensor4dDescriptor(cudnnTensorDescriptor_t tensorDesc,
                             cudnnTensorFormat_t format,
                             cudnnDataType_t dataType,
                             int n,
@@ -91,48 +148,44 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensor4dDescriptor( cudnnTensorDesc
 
     CudnnFrontend::Execute("cudnnSetTensor4dDescriptor");
     if (CudnnFrontend::Success()) {
-        tensorDesc = CudnnFrontend::GetOutputVariable<cudnnTensorDescriptor_t>();
+        // tensorDesc = CudnnFrontend::GetOutputVariable<cudnnTensorDescriptor_t>();
         registerDescriptorType(tensorDesc, dataType);
     }
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensor4dDescriptorEx(
-    cudnnTensorDescriptor_t tensorDesc,
-    cudnnDataType_t dataType,
-    int n,
-    int c,
-    int h,
-    int w,
-    int nStride,
-    int cStride,
-    int hStride,
-    int wStride) {
-
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensor4dDescriptorEx(cudnnTensorDescriptor_t tensorDesc,
+                              cudnnDataType_t dataType,
+                              int n,
+                              int c,
+                              int h,
+                              int w,
+                              int nStride,
+                              int cStride,
+                              int hStride,
+                              int wStride ) {
     CudnnFrontend::Prepare();
-    CudnnFrontend::AddDevicePointerForArguments(tensorDesc);  // Must be allocated and tracked
+
+    CudnnFrontend::AddDevicePointerForArguments(tensorDesc);
     CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(dataType);
     CudnnFrontend::AddVariableForArguments<int>(n);
     CudnnFrontend::AddVariableForArguments<int>(c);
     CudnnFrontend::AddVariableForArguments<int>(h);
     CudnnFrontend::AddVariableForArguments<int>(w);
+
     CudnnFrontend::AddVariableForArguments<int>(nStride);
     CudnnFrontend::AddVariableForArguments<int>(cStride);
     CudnnFrontend::AddVariableForArguments<int>(hStride);
     CudnnFrontend::AddVariableForArguments<int>(wStride);
 
-    CudnnFrontend::Execute("cudnnSetTensor4dDescriptorEx");    //Fixed - Renamed from SetTensor4dDescriptorEx to cudnnSetTensor4dDescriptorEx
-
+    CudnnFrontend::Execute("cudnnSetTensor4dDescriptorEx");
     if (CudnnFrontend::Success()) {
-        // DO NOT overwrite the pointer!
         registerDescriptorType(tensorDesc, dataType);
     }
-
     return CudnnFrontend::GetExitCode();
 }
 
-
-extern "C"  cudnnStatus_t CUDNNWINAPI cudnnGetTensor4dDescriptor( const cudnnTensorDescriptor_t tensorDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetTensor4dDescriptor(const cudnnTensorDescriptor_t tensorDesc,
                             cudnnDataType_t *dataType,
                             int *n,
                             int *c,
@@ -161,7 +214,7 @@ extern "C"  cudnnStatus_t CUDNNWINAPI cudnnGetTensor4dDescriptor( const cudnnTen
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensorNdDescriptor( cudnnTensorDescriptor_t tensorDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensorNdDescriptor(cudnnTensorDescriptor_t tensorDesc,
                             cudnnDataType_t dataType,
                             int nbDims,
                             const int *dimA,
@@ -176,8 +229,11 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensorNdDescriptor( cudnnTensorDesc
     CudnnFrontend::AddHostPointerForArguments<const int>(strideA, nbDims);
 
     CudnnFrontend::Execute("cudnnSetTensorNdDescriptor");
-    if (CudnnFrontend::Success())
+    if (CudnnFrontend::Success()) {
+        cout << "Successfully set tensor descriptor " << tensorDesc << " with data type " << dataType << endl;
         registerDescriptorType(tensorDesc, dataType);
+        cout << "isFloatDescriptor: " << isFloatDescriptor(tensorDesc) << endl;
+    }
     return CudnnFrontend::GetExitCode();
 }
 
@@ -187,15 +243,14 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensorNdDescriptorEx(cudnnTensorDes
                                                                   int nbDims,
                                                                   const int *dimA) {
 
-     CudnnFrontend::Prepare();
-    
-     CudnnFrontend::AddVariableForArguments<cudnnTensorFormat_t>(format);
-     CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(dataType);
-     CudnnFrontend::AddVariableForArguments<int>(nbDims);
-     CudnnFrontend::AddHostPointerForArguments<int>((int*)dimA);
+    CudnnFrontend::Prepare();
+
+    CudnnFrontend::AddVariableForArguments<cudnnTensorFormat_t>(format);
+    CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(dataType);
+    CudnnFrontend::AddVariableForArguments<int>(nbDims);
+    CudnnFrontend::AddHostPointerForArguments<int>((int*)dimA);
    
-      if (CudnnFrontend::Success()) {
-        tensorDesc = CudnnFrontend::GetOutputVariable<cudnnTensorDescriptor_t>();
+    if (CudnnFrontend::Success()) {
         registerDescriptorType(tensorDesc, dataType);
     }
     return CudnnFrontend::GetExitCode();      
@@ -314,7 +369,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetTensorSizeInBytes(const cudnnTensor
 
     CudnnFrontend::Execute("cudnnGetTensorSizeInBytes");
     if (CudnnFrontend::Success()) {
-       *size = CudnnFrontend::GetOutputVariable<size_t>();
+        *size = CudnnFrontend::GetOutputVariable<size_t>();
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -339,8 +394,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnInitTransformDest(const cudnnTensorTra
     CudnnFrontend::Execute("cudnnInitTransformDest");
     
     if (CudnnFrontend::Success()) {
-       destDesc = CudnnFrontend::GetOutputVariable<cudnnTensorDescriptor_t>();
-       *destSizeInBytes = CudnnFrontend::GetOutputVariable<size_t>();
+        destDesc = CudnnFrontend::GetOutputVariable<cudnnTensorDescriptor_t>();
+        *destSizeInBytes = CudnnFrontend::GetOutputVariable<size_t>();
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -351,7 +406,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateTensorTransformDescriptor(cudnnT
     CudnnFrontend::Execute("cudnnCreateTensorTransformDescriptor");
    
     if (CudnnFrontend::Success()) {
-       *transformDesc = CudnnFrontend::GetOutputVariable<cudnnTensorTransformDescriptor_t>();
+        *transformDesc = CudnnFrontend::GetOutputVariable<cudnnTensorTransformDescriptor_t>();
     }
     return CudnnFrontend::GetExitCode();   
 }
@@ -374,9 +429,9 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensorTransformDescriptor(cudnnTens
     CudnnFrontend::AddVariableForArguments<cudnnFoldingDirection_t>(direction);
 
     CudnnFrontend::Execute("cudnnSetTensorTransformDescriptor");
-    if (CudnnFrontend::Success()) {
-        transformDesc = CudnnFrontend::GetOutputVariable<cudnnTensorTransformDescriptor_t>();
-    }
+    // if (CudnnFrontend::Success()) {
+    //     transformDesc = CudnnFrontend::GetOutputVariable<cudnnTensorTransformDescriptor_t>();
+    // }
     return CudnnFrontend::GetExitCode(); 
 }
 
@@ -436,7 +491,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnTransformTensor( cudnnHandle_t       h
 
     CudnnFrontend::Execute("cudnnTransformTensor");
     if (CudnnFrontend::Success()) {
-       y = CudnnFrontend::GetOutputDevicePointer();
+        y = CudnnFrontend::GetOutputDevicePointer();
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -530,7 +585,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnAddTensor(
     CudnnFrontend::Execute("cudnnAddTensor");
     if (CudnnFrontend::Success()) {
         C = CudnnFrontend::GetOutputDevicePointer();
-     }
+    }
     return CudnnFrontend::GetExitCode();
 }
 
@@ -575,9 +630,9 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetOpTensorDescriptor(const cudnnOpTen
 
    CudnnFrontend::Execute("cudnnGetOpTensorDescriptor");
    if (CudnnFrontend::Success()) {
-      *opTensorOp = CudnnFrontend::GetOutputVariable<cudnnOpTensorOp_t>();
-      *opTensorCompType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
-      *opTensorNanOpt   = CudnnFrontend::GetOutputVariable<cudnnNanPropagation_t>();
+        *opTensorOp = CudnnFrontend::GetOutputVariable<cudnnOpTensorOp_t>();
+        *opTensorCompType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
+        *opTensorNanOpt   = CudnnFrontend::GetOutputVariable<cudnnNanPropagation_t>();
    }
    return CudnnFrontend::GetExitCode();
 }
@@ -660,7 +715,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetReduceTensorDescriptor(cudnnReduceT
 
     CudnnFrontend::Execute("cudnnSetReduceTensorDescriptor");
     if (CudnnFrontend::Success()) {
-       reduceTensorDesc = CudnnFrontend::GetOutputVariable<cudnnReduceTensorDescriptor_t>();
+        reduceTensorDesc = CudnnFrontend::GetOutputVariable<cudnnReduceTensorDescriptor_t>();
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -749,7 +804,6 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnReduceTensor(cudnnHandle_t handle,
                                                        const cudnnTensorDescriptor_t cDesc,
                                                        void *C) {
 
-
     CudnnFrontend::Prepare();
 
     CudnnFrontend::AddDevicePointerForArguments(handle);
@@ -770,8 +824,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnReduceTensor(cudnnHandle_t handle,
 
     CudnnFrontend::Execute("cudnnReduceTensor");
     if (CudnnFrontend::Success()) {
-       indices = CudnnFrontend::GetOutputDevicePointer();
-       C       = CudnnFrontend::GetOutputDevicePointer();
+        indices = CudnnFrontend::GetOutputDevicePointer();
+        C       = CudnnFrontend::GetOutputDevicePointer();
     }  
     return CudnnFrontend::GetExitCode();
 }
@@ -816,8 +870,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateFilterDescriptor(cudnnFilterDesc
 
     CudnnFrontend::Execute("cudnnCreateFilterDescriptor");
     if (CudnnFrontend::Success()) {
-       *filterDesc = CudnnFrontend::GetOutputVariable<cudnnFilterDescriptor_t>();
-     }
+        *filterDesc = CudnnFrontend::GetOutputVariable<cudnnFilterDescriptor_t>();
+    }
     return CudnnFrontend::GetExitCode();
 }
 
@@ -844,7 +898,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetFilter4dDescriptor( cudnnFilterDesc
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C"  CUDNNWINAPI cudnnStatus_t cudnnGetFilter4dDescriptor( cudnnFilterDescriptor_t filterDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetFilter4dDescriptor( cudnnFilterDescriptor_t filterDesc,
                                                                                 cudnnDataType_t *dataType,
                                                                                 cudnnTensorFormat_t  *format,
                                                                                 int *k,
@@ -890,7 +944,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetFilter4dDescriptor_v3( cudnnFilterD
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C"  CUDNNWINAPI cudnnStatus_t cudnnGetFilter4dDescriptor_v3( cudnnFilterDescriptor_t filterDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetFilter4dDescriptor_v3( cudnnFilterDescriptor_t filterDesc,
                                                                     cudnnDataType_t *dataType,
                                                                     int *k,
                                                                     int *c,
@@ -935,7 +989,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetFilter4dDescriptor_v4( cudnnFilterD
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C"  CUDNNWINAPI cudnnStatus_t cudnnGetFilter4dDescriptor_v4( cudnnFilterDescriptor_t filterDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetFilter4dDescriptor_v4( cudnnFilterDescriptor_t filterDesc,
                                                                                 cudnnDataType_t *dataType,
                                                                                 cudnnTensorFormat_t  *format,
                                                                                 int *k,
@@ -1162,8 +1216,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnReorderFilterAndBias(cudnnHandle_t han
    CudnnFrontend::Execute("cudnnReorderFilterAndBias");
 
     if (CudnnFrontend::Success()) {
-         reorderedFilterData = CudnnFrontend::GetOutputDevicePointer();
-         reorderedBiasData = CudnnFrontend::GetOutputDevicePointer();
+        reorderedFilterData = CudnnFrontend::GetOutputDevicePointer();
+        reorderedBiasData = CudnnFrontend::GetOutputDevicePointer();
     }
    
    return CudnnFrontend::GetExitCode();
@@ -1174,7 +1228,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateConvolutionDescriptor(cudnnConvo
 
     CudnnFrontend::Execute("cudnnCreateConvolutionDescriptor");
     if (CudnnFrontend::Success()) {
-         *convDesc = CudnnFrontend::GetOutputVariable<cudnnConvolutionDescriptor_t>();
+        *convDesc = CudnnFrontend::GetOutputVariable<cudnnConvolutionDescriptor_t>();
     }       
     return CudnnFrontend::GetExitCode();
 }
@@ -1199,34 +1253,34 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionMathType(cudnnConvolutio
 
     CudnnFrontend::Execute("cudnnGetConvolutionMathType");
     if (CudnnFrontend::Success()) {
-       *mathType = CudnnFrontend::GetOutputVariable<cudnnMathType_t>();
-     }
-     return CudnnFrontend::GetExitCode();
+        *mathType = CudnnFrontend::GetOutputVariable<cudnnMathType_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetConvolutionGroupCount(cudnnConvolutionDescriptor_t convDesc, int groupCount) {
 
-     CudnnFrontend::Prepare();
-     
-     CudnnFrontend::AddDevicePointerForArguments(convDesc);
-     CudnnFrontend::AddVariableForArguments<int>(groupCount);
-     
-     CudnnFrontend::Execute("cudnnSetConvolutionGroupCount");
-     
-     return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Prepare();
+
+    CudnnFrontend::AddDevicePointerForArguments(convDesc);
+    CudnnFrontend::AddVariableForArguments<int>(groupCount);
+    
+    CudnnFrontend::Execute("cudnnSetConvolutionGroupCount");
+    
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionGroupCount(cudnnConvolutionDescriptor_t convDesc, int *groupCount) {
 
-     CudnnFrontend::Prepare();
-    
-     CudnnFrontend::AddDevicePointerForArguments(convDesc);
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::Execute("cudnnGetConvolutionGroupCount");
-     if (CudnnFrontend::Success()) {
-         *groupCount = CudnnFrontend::GetOutputVariable<int>();
-     }
-     return CudnnFrontend::GetExitCode();
+    CudnnFrontend::AddDevicePointerForArguments(convDesc);
+
+    CudnnFrontend::Execute("cudnnGetConvolutionGroupCount");
+    if (CudnnFrontend::Success()) {
+        *groupCount = CudnnFrontend::GetOutputVariable<int>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetConvolutionReorderType(cudnnConvolutionDescriptor_t convDesc,
@@ -1281,7 +1335,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI  cudnnSetConvolution2dDescriptor( cudnnConv
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnGetConvolution2dDescriptor( const cudnnConvolutionDescriptor_t convDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolution2dDescriptor( const cudnnConvolutionDescriptor_t convDesc,
                                                                         int* pad_h,
                                                                         int* pad_w,
                                                                         int* u,
@@ -1309,7 +1363,7 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnGetConvolution2dDescriptor( const cudn
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" cudnnStatus_t cudnnGetConvolution2dForwardOutputDim( const cudnnConvolutionDescriptor_t convDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolution2dForwardOutputDim( const cudnnConvolutionDescriptor_t convDesc,
                                                                 const cudnnTensorDescriptor_t inputTensorDesc,
                                                                 const cudnnFilterDescriptor_t filterDesc,
                                                                 int *n,
@@ -1398,7 +1452,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionNdForwardOutputDim(const
 
     CudnnFrontend::Execute("cudnnGetConvolutionNdForwardOutputDim");
     if (CudnnFrontend::Success()) {
-       *tensorOuputDimA =  CudnnFrontend::GetOutputVariable<int>();
+        int *outputDims =  CudnnFrontend::GetOutputHostPointer<int>(nbDims);
+        std::memcpy(tensorOuputDimA, outputDims, nbDims *  sizeof(int));
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -1593,8 +1648,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnConvolutionForward(cudnnHandle_t handl
     CudnnFrontend::AddDevicePointerForArguments(handle);
     CudnnFrontend::AddDevicePointerForArguments(xDesc);
     isFloatDescriptor(xDesc)
-        ? CudnnFrontend::AddHostPointerForArguments<const float>(reinterpret_cast<const float*>(alpha))
-        : CudnnFrontend::AddHostPointerForArguments<const double>(reinterpret_cast<const double*>(alpha));
+        ? CudnnFrontend::AddHostPointerForArguments(alpha, sizeof(float))
+        : CudnnFrontend::AddHostPointerForArguments(alpha, sizeof(double));
     CudnnFrontend::AddDevicePointerForArguments(x);
     CudnnFrontend::AddDevicePointerForArguments(wDesc);
     CudnnFrontend::AddDevicePointerForArguments(w);
@@ -1784,21 +1839,21 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionBackwardFilterAlgorithm(
                                                                                 size_t memoryLimitInBytes,
                                                                                 cudnnConvolutionBwdFilterAlgo_t *algo) {
 
-     CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::AddDevicePointerForArguments(handle);
-     CudnnFrontend::AddDevicePointerForArguments(xDesc);
-     CudnnFrontend::AddDevicePointerForArguments(dyDesc);
-     CudnnFrontend::AddDevicePointerForArguments(convDesc);
-     CudnnFrontend::AddDevicePointerForArguments(dwDesc);
-     CudnnFrontend::AddVariableForArguments<cudnnConvolutionBwdFilterPreference_t>(preference);
-     CudnnFrontend::AddVariableForArguments<size_t>(memoryLimitInBytes);
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(xDesc);
+    CudnnFrontend::AddDevicePointerForArguments(dyDesc);
+    CudnnFrontend::AddDevicePointerForArguments(convDesc);
+    CudnnFrontend::AddDevicePointerForArguments(dwDesc);
+    CudnnFrontend::AddVariableForArguments<cudnnConvolutionBwdFilterPreference_t>(preference);
+    CudnnFrontend::AddVariableForArguments<size_t>(memoryLimitInBytes);
 
-     CudnnFrontend::Execute("cudnnGetConvolutionBackwardFilterAlgorithm");
-     if (CudnnFrontend::Success()) {
-         *algo = CudnnFrontend::GetOutputVariable<cudnnConvolutionBwdFilterAlgo_t>();
-     }
-     return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnGetConvolutionBackwardFilterAlgorithm");
+    if (CudnnFrontend::Success()) {
+        *algo = CudnnFrontend::GetOutputVariable<cudnnConvolutionBwdFilterAlgo_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 #endif
 
@@ -1840,16 +1895,14 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionBackwardFilterWorkspaceS
                                                                                     cudnnConvolutionBwdFilterAlgo_t algo,
                                                                                     size_t *sizeInBytes) {
 
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::Prepare();
-
-     CudnnFrontend::AddDevicePointerForArguments(handle);
-     CudnnFrontend::AddDevicePointerForArguments(xDesc);
-     CudnnFrontend::AddDevicePointerForArguments(dyDesc);
-     CudnnFrontend::AddDevicePointerForArguments(convDesc);
-     CudnnFrontend::AddDevicePointerForArguments(gradDesc);
-     CudnnFrontend::AddVariableForArguments<cudnnConvolutionBwdFilterAlgo_t>(algo);
-     
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(xDesc);
+    CudnnFrontend::AddDevicePointerForArguments(dyDesc);
+    CudnnFrontend::AddDevicePointerForArguments(convDesc);
+    CudnnFrontend::AddDevicePointerForArguments(gradDesc);
+    CudnnFrontend::AddVariableForArguments<cudnnConvolutionBwdFilterAlgo_t>(algo);
 
     CudnnFrontend::Execute("cudnnGetConvolutionBackwardFilterWorkspaceSize");
     if (CudnnFrontend::Success()) {
@@ -1988,21 +2041,21 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionBackwardDataAlgorithm(cu
 									      size_t memoryLimitInBytes,
 									      cudnnConvolutionBwdDataAlgo_t *algo) {
 
-     CudnnFrontend::Prepare();
-    
-     CudnnFrontend::AddDevicePointerForArguments(handle);
-     CudnnFrontend::AddDevicePointerForArguments(wDesc);
-     CudnnFrontend::AddDevicePointerForArguments(dyDesc);
-     CudnnFrontend::AddDevicePointerForArguments(convDesc);
-     CudnnFrontend::AddDevicePointerForArguments(dxDesc);
-     CudnnFrontend::AddVariableForArguments<cudnnConvolutionBwdDataPreference_t>(preference);
-     CudnnFrontend::AddVariableForArguments<size_t>(memoryLimitInBytes);
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::Execute("cudnnGetConvolutionBackwardDataAlgorithm");
-     if (CudnnFrontend::Success()) {
-          *algo = CudnnFrontend::GetOutputVariable<cudnnConvolutionBwdDataAlgo_t>();
-     }
-     return CudnnFrontend::GetExitCode();
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(wDesc);
+    CudnnFrontend::AddDevicePointerForArguments(dyDesc);
+    CudnnFrontend::AddDevicePointerForArguments(convDesc);
+    CudnnFrontend::AddDevicePointerForArguments(dxDesc);
+    CudnnFrontend::AddVariableForArguments<cudnnConvolutionBwdDataPreference_t>(preference);
+    CudnnFrontend::AddVariableForArguments<size_t>(memoryLimitInBytes);
+
+    CudnnFrontend::Execute("cudnnGetConvolutionBackwardDataAlgorithm");
+    if (CudnnFrontend::Success()) {
+        *algo = CudnnFrontend::GetOutputVariable<cudnnConvolutionBwdDataAlgo_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 #endif
 
@@ -2044,7 +2097,6 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionBackwardDataWorkspaceSiz
 										  cudnnConvolutionBwdDataAlgo_t algo,
 										  size_t *sizeInBytes) {
 
-
     CudnnFrontend::Prepare();
 
     CudnnFrontend::AddDevicePointerForArguments(handle);
@@ -2056,7 +2108,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetConvolutionBackwardDataWorkspaceSiz
  
     CudnnFrontend::Execute("cudnnGetConvolutionBackwardDataWorkspaceSize");
     if (CudnnFrontend::Success()) {
-          *sizeInBytes = CudnnFrontend::GetOutputVariable<size_t>(); 
+        *sizeInBytes = CudnnFrontend::GetOutputVariable<size_t>(); 
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -2098,8 +2150,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnConvolutionBackwardData(cudnnHandle_t 
     CudnnFrontend::Execute("cudnnConvolutionBackwardData");
     if (CudnnFrontend::Success()) {
         dx = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnIm2Col(cudnnHandle_t handle,
@@ -2109,19 +2161,19 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnIm2Col(cudnnHandle_t handle,
 						 const cudnnConvolutionDescriptor_t convDesc,
 						 void *colBuffer) {
 
-     CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::AddDevicePointerForArguments(handle);
-     CudnnFrontend::AddDevicePointerForArguments(xDesc);
-     CudnnFrontend::AddHostPointerForArguments(x);
-     CudnnFrontend::AddDevicePointerForArguments(wDesc);
-     CudnnFrontend::AddDevicePointerForArguments(convDesc);
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(xDesc);
+    CudnnFrontend::AddHostPointerForArguments(x);
+    CudnnFrontend::AddDevicePointerForArguments(wDesc);
+    CudnnFrontend::AddDevicePointerForArguments(convDesc);
 
-     CudnnFrontend::Execute("cudnnIm2Col");
-     if (CudnnFrontend::Success()) {
-         colBuffer = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnIm2Col");
+    if (CudnnFrontend::Success()) {
+        colBuffer = CudnnFrontend::GetOutputDevicePointer();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSoftmaxForward(cudnnHandle_t handle,
@@ -2152,9 +2204,9 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSoftmaxForward(cudnnHandle_t handle,
 
     CudnnFrontend::Execute("cudnnSoftmaxForward");
     if (CudnnFrontend::Success()) {
-         y = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+        y = CudnnFrontend::GetOutputDevicePointer();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSoftmaxBackward(cudnnHandle_t handle,
@@ -2189,17 +2241,17 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSoftmaxBackward(cudnnHandle_t handle,
     CudnnFrontend::Execute("cudnnSoftmaxBackward");
     if (CudnnFrontend::Success()) {
         dx = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreatePoolingDescriptor(cudnnPoolingDescriptor_t *poolingDesc) {
-   CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
-   CudnnFrontend::Execute("cudnnCreatePoolingDescriptor");
-   if (CudnnFrontend::Success())
-      *poolingDesc = CudnnFrontend::GetOutputVariable<cudnnPoolingDescriptor_t>();
-   return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnCreatePoolingDescriptor");
+    if (CudnnFrontend::Success())
+        *poolingDesc = CudnnFrontend::GetOutputVariable<cudnnPoolingDescriptor_t>();
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetPooling2dDescriptor(cudnnPoolingDescriptor_t poolingDesc,
@@ -2315,11 +2367,11 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetPoolingNdForwardOutputDim(const cud
 								       int nbDims,
 								       int *outputTensorDimA) {
 
-     CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::AddDevicePointerForArguments(poolingDesc);
-     CudnnFrontend::AddDevicePointerForArguments(inputTensorDesc);
-     CudnnFrontend::AddVariableForArguments<int>(nbDims);
+    CudnnFrontend::AddDevicePointerForArguments(poolingDesc);
+    CudnnFrontend::AddDevicePointerForArguments(inputTensorDesc);
+    CudnnFrontend::AddVariableForArguments<int>(nbDims);
 
     CudnnFrontend::Execute("cudnnGetPoolingNdForwardOutputDim");
     if (CudnnFrontend::Success()) {
@@ -3005,12 +3057,15 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnBatchNormalizationForwardInference(cud
     CudnnFrontend::AddDevicePointerForArguments(handle);
     CudnnFrontend::AddVariableForArguments<cudnnBatchNormMode_t>(mode);
     CudnnFrontend::AddDevicePointerForArguments(xDesc);
-    isFloatDescriptor(xDesc)
-        ? CudnnFrontend::AddHostPointerForArguments<const float>(reinterpret_cast<const float*>(alpha))
-        : CudnnFrontend::AddHostPointerForArguments<const double>(reinterpret_cast<const double*>(alpha));
-    isFloatDescriptor(xDesc)
-        ? CudnnFrontend::AddHostPointerForArguments<const float>(reinterpret_cast<const float*>(beta))
-        : CudnnFrontend::AddHostPointerForArguments<const double>(reinterpret_cast<const double*>(beta));
+    // cout << "xDesc: " << xDesc << endl;
+    // cout << "isFloatDescriptor(xDesc): " << isFloatDescriptor(xDesc) << endl;
+    if (isFloatDescriptor(xDesc)) {
+        CudnnFrontend::AddHostPointerForArguments<char>((char*)alpha, sizeof(float));
+        CudnnFrontend::AddHostPointerForArguments<char>((char*)beta, sizeof(float));
+    } else {
+        CudnnFrontend::AddHostPointerForArguments<char>((char*)alpha, sizeof(double));
+        CudnnFrontend::AddHostPointerForArguments<char>((char*)beta, sizeof(double));
+    }
     CudnnFrontend::AddDevicePointerForArguments(x);
     CudnnFrontend::AddDevicePointerForArguments(yDesc);
     CudnnFrontend::AddDevicePointerForArguments(y);
@@ -3022,9 +3077,9 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnBatchNormalizationForwardInference(cud
     CudnnFrontend::AddVariableForArguments<double>(epsilon);
 
     CudnnFrontend::Execute("cudnnBatchNormalizationForwardInference");
-    if (CudnnFrontend::Success()) {
-        y = CudnnFrontend::GetOutputDevicePointer();
-    }
+    // if (CudnnFrontend::Success()) {
+    //     y = CudnnFrontend::GetOutputDevicePointer();
+    // }
    
     return CudnnFrontend::GetExitCode();
 }
@@ -3052,6 +3107,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnBatchNormalizationBackward(cudnnHandle
     CudnnFrontend::Prepare();
 
     CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddVariableForArguments<cudnnBatchNormMode_t>(mode);
     CudnnFrontend::AddDevicePointerForArguments(xDesc);
     isFloatDescriptor(xDesc)
         ? CudnnFrontend::AddHostPointerForArguments<const float>(reinterpret_cast<const float*>(alphaDataDiff))
@@ -3795,26 +3851,24 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetRNNTempSpaceSizes(cudnnHandle_t han
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateSeqDataDescriptor(cudnnSeqDataDescriptor_t *seqDataDesc) {
 
+    CudnnFrontend::Prepare();
 
-      CudnnFrontend::Prepare();
-
-      CudnnFrontend::Execute("cudnnCreateSeqDataDescriptor");
-      if (CudnnFrontend::Success()) {
-           *seqDataDesc       =  CudnnFrontend::GetOutputVariable<cudnnSeqDataDescriptor_t>();
-      }
-      return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnCreateSeqDataDescriptor");
+    if (CudnnFrontend::Success()) {
+        *seqDataDesc       =  CudnnFrontend::GetOutputVariable<cudnnSeqDataDescriptor_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
    
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnDestroySeqDataDescriptor(cudnnSeqDataDescriptor_t seqDataDesc) {
 
+    CudnnFrontend::Prepare();
 
-      CudnnFrontend::Prepare();
-
-      CudnnFrontend::AddDevicePointerForArguments(seqDataDesc);
-      
-      CudnnFrontend::Execute("cudnnDestroySeqDataDescriptor");
-      
-      return CudnnFrontend::GetExitCode();    
+    CudnnFrontend::AddDevicePointerForArguments(seqDataDesc);
+    
+    CudnnFrontend::Execute("cudnnDestroySeqDataDescriptor");
+    
+    return CudnnFrontend::GetExitCode();    
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetSeqDataDescriptor(cudnnSeqDataDescriptor_t seqDataDesc,
@@ -3826,23 +3880,21 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetSeqDataDescriptor(cudnnSeqDataDescr
                           				       const int *seqLengthArray,
                           				       void *paddingFill) {
 
+    CudnnFrontend::Prepare();
 
-      CudnnFrontend::Prepare();
+    CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(dataType);
+    CudnnFrontend::AddVariableForArguments<int>(nbDims); 
+    CudnnFrontend::AddHostPointerForArguments<int>((int*)dimA);
+    CudnnFrontend::AddHostPointerForArguments<cudnnSeqDataAxis_t>((cudnnSeqDataAxis_t*)axes);
+    CudnnFrontend::AddVariableForArguments<size_t>(seqLengthArraySize); 
+    CudnnFrontend::AddHostPointerForArguments<int>((int*)seqLengthArray);
+    CudnnFrontend::AddHostPointerForArguments(paddingFill);
 
-
-      CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(dataType);
-      CudnnFrontend::AddVariableForArguments<int>(nbDims); 
-      CudnnFrontend::AddHostPointerForArguments<int>((int*)dimA);
-      CudnnFrontend::AddHostPointerForArguments<cudnnSeqDataAxis_t>((cudnnSeqDataAxis_t*)axes);
-      CudnnFrontend::AddVariableForArguments<size_t>(seqLengthArraySize); 
-      CudnnFrontend::AddHostPointerForArguments<int>((int*)seqLengthArray);
-      CudnnFrontend::AddHostPointerForArguments(paddingFill);
-
-      CudnnFrontend::Execute("cudnnSetSeqDataDescriptor");
-      if (CudnnFrontend::Success()) {
-          seqDataDesc = CudnnFrontend::GetOutputVariable<cudnnSeqDataDescriptor_t>();
-      }
-      return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnSetSeqDataDescriptor");
+    if (CudnnFrontend::Success()) {
+        seqDataDesc = CudnnFrontend::GetOutputVariable<cudnnSeqDataDescriptor_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetSeqDataDescriptor(const cudnnSeqDataDescriptor_t seqDataDesc,
@@ -3856,47 +3908,45 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetSeqDataDescriptor(const cudnnSeqDat
                           				       int *seqLengthArray,
                           				       void *paddingFill) {
 
+    CudnnFrontend::Prepare();
 
+    CudnnFrontend::AddDevicePointerForArguments(seqDataDesc);
+    CudnnFrontend::AddVariableForArguments<int>(nbDimsRequested);
+    CudnnFrontend::AddVariableForArguments<size_t>(seqLengthSizeRequested);
 
-     CudnnFrontend::Prepare();
-
-     CudnnFrontend::AddDevicePointerForArguments(seqDataDesc);
-     CudnnFrontend::AddVariableForArguments<int>(nbDimsRequested);
-     CudnnFrontend::AddVariableForArguments<size_t>(seqLengthSizeRequested);
-
-     CudnnFrontend::Execute("cudnnGetSeqDataDescriptor");
-      if (CudnnFrontend::Success()) {
-          *dataType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
-          *nbDims   = CudnnFrontend::GetOutputVariable<int>();
-          *dimA     = CudnnFrontend::GetOutputVariable<int>();
-          *axes     = CudnnFrontend::GetOutputVariable<cudnnSeqDataAxis_t>();
-          *seqLengthArraySize = CudnnFrontend::GetOutputVariable<size_t>();
-          *seqLengthArray     = CudnnFrontend::GetOutputVariable<int>();
-          paddingFill        = CudnnFrontend::GetOutputDevicePointer();
-      }
-      return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnGetSeqDataDescriptor");
+    if (CudnnFrontend::Success()) {
+        *dataType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
+        *nbDims   = CudnnFrontend::GetOutputVariable<int>();
+        *dimA     = CudnnFrontend::GetOutputVariable<int>();
+        *axes     = CudnnFrontend::GetOutputVariable<cudnnSeqDataAxis_t>();
+        *seqLengthArraySize = CudnnFrontend::GetOutputVariable<size_t>();
+        *seqLengthArray     = CudnnFrontend::GetOutputVariable<int>();
+        paddingFill        = CudnnFrontend::GetOutputDevicePointer();
+    }
+    return CudnnFrontend::GetExitCode();
 }
      
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateAttnDescriptor(cudnnAttnDescriptor_t *attnDesc) {
 
-     CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::Execute("cudnnCreateAttnDescriptor");
-      if (CudnnFrontend::Success()) {
-           *attnDesc = CudnnFrontend::GetOutputVariable<cudnnAttnDescriptor_t>();
-      }
-      return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnCreateAttnDescriptor");
+    if (CudnnFrontend::Success()) {
+        *attnDesc = CudnnFrontend::GetOutputVariable<cudnnAttnDescriptor_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnDestroyAttnDescriptor(cudnnAttnDescriptor_t attnDesc) {
 
-     CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::AddDevicePointerForArguments(attnDesc);
+    CudnnFrontend::AddDevicePointerForArguments(attnDesc);
 
-     CudnnFrontend::Execute("cudnnDestroyAttnDescriptor");
-    
-     return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnDestroyAttnDescriptor");
+
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetAttnDescriptor(cudnnAttnDescriptor_t attnDesc,
@@ -3922,35 +3972,33 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetAttnDescriptor(cudnnAttnDescriptor_
 
 
 
-     CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
+    CudnnFrontend::AddVariableForArguments<unsigned>(attnMode);
+    CudnnFrontend::AddVariableForArguments<int>(nHeads);
+    CudnnFrontend::AddVariableForArguments<double>(smScaler);
+    CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(dataType);
+    CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(computePrec);
+    CudnnFrontend::AddVariableForArguments<cudnnMathType_t>(mathType);
+    CudnnFrontend::AddDevicePointerForArguments(attnDropoutDesc);
+    CudnnFrontend::AddDevicePointerForArguments(postDropoutDesc);
+    CudnnFrontend::AddVariableForArguments<int>(qSize);
+    CudnnFrontend::AddVariableForArguments<int>(kSize);
+    CudnnFrontend::AddVariableForArguments<int>(vSize);
+    CudnnFrontend::AddVariableForArguments<int>(qProjSize);
+    CudnnFrontend::AddVariableForArguments<int>(kProjSize);
+    CudnnFrontend::AddVariableForArguments<int>(vProjSize);
+    CudnnFrontend::AddVariableForArguments<int>(oProjSize);
+    CudnnFrontend::AddVariableForArguments<int>(qoMaxSeqLength);
+    CudnnFrontend::AddVariableForArguments<int>(kvMaxSeqLength);
+    CudnnFrontend::AddVariableForArguments<int>(maxBatchSize);
+    CudnnFrontend::AddVariableForArguments<int>(maxBeamSize);
 
-
-     CudnnFrontend::AddVariableForArguments<unsigned>(attnMode);
-     CudnnFrontend::AddVariableForArguments<int>(nHeads);
-     CudnnFrontend::AddVariableForArguments<double>(smScaler);
-     CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(dataType);
-     CudnnFrontend::AddVariableForArguments<cudnnDataType_t>(computePrec);
-     CudnnFrontend::AddVariableForArguments<cudnnMathType_t>(mathType);
-     CudnnFrontend::AddDevicePointerForArguments(attnDropoutDesc);
-     CudnnFrontend::AddDevicePointerForArguments(postDropoutDesc);
-     CudnnFrontend::AddVariableForArguments<int>(qSize);
-     CudnnFrontend::AddVariableForArguments<int>(kSize);
-     CudnnFrontend::AddVariableForArguments<int>(vSize);
-     CudnnFrontend::AddVariableForArguments<int>(qProjSize);
-     CudnnFrontend::AddVariableForArguments<int>(kProjSize);
-     CudnnFrontend::AddVariableForArguments<int>(vProjSize);
-     CudnnFrontend::AddVariableForArguments<int>(oProjSize);
-     CudnnFrontend::AddVariableForArguments<int>(qoMaxSeqLength);
-     CudnnFrontend::AddVariableForArguments<int>(kvMaxSeqLength);
-     CudnnFrontend::AddVariableForArguments<int>(maxBatchSize);
-     CudnnFrontend::AddVariableForArguments<int>(maxBeamSize);
-
-      CudnnFrontend::Execute("cudnnSetAttnDescriptor");
-      if (CudnnFrontend::Success()) {
-           attnDesc = CudnnFrontend::GetOutputVariable<cudnnAttnDescriptor_t>();
-      }
-      return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnSetAttnDescriptor");
+    if (CudnnFrontend::Success()) {
+        attnDesc = CudnnFrontend::GetOutputVariable<cudnnAttnDescriptor_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetAttnDescriptor(cudnnAttnDescriptor_t attnDesc,
@@ -3974,33 +4022,32 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetAttnDescriptor(cudnnAttnDescriptor_
                        				            int *maxBatchSize,
                        					    int *maxBeamSize) {
 
-      CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
+    CudnnFrontend::AddDevicePointerForArguments(attnDesc);
 
-      CudnnFrontend::AddDevicePointerForArguments(attnDesc);
-
-      CudnnFrontend::Execute("cudnnGetAttnDescriptor");
-      if (CudnnFrontend::Success()) {
-  	    *attnMode =   CudnnFrontend::GetOutputVariable<unsigned>();
-  	    *nHeads = CudnnFrontend::GetOutputVariable<int>();
-  	    *smScaler =   CudnnFrontend::GetOutputVariable<double>();
-  	    *dataType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
-  	    *computePrec = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
-  	    *mathType = CudnnFrontend::GetOutputVariable<cudnnMathType_t>();
-  	    *attnDropoutDesc = CudnnFrontend::GetOutputVariable<cudnnDropoutDescriptor_t>();
-  	    *postDropoutDesc = CudnnFrontend::GetOutputVariable<cudnnDropoutDescriptor_t>();
-  	    *qSize = CudnnFrontend::GetOutputVariable<int>();
-  	    *kSize = CudnnFrontend::GetOutputVariable<int>();
-  	    *vSize = CudnnFrontend::GetOutputVariable<int>();
-  	    *qProjSize = CudnnFrontend::GetOutputVariable<int>();
-  	    *vProjSize = CudnnFrontend::GetOutputVariable<int>();
-  	    *oProjSize = CudnnFrontend::GetOutputVariable<int>();
-  	    *qoMaxSeqLength = CudnnFrontend::GetOutputVariable<int>();
-  	    *kvMaxSeqLength = CudnnFrontend::GetOutputVariable<int>();
-  	    *maxBatchSize = CudnnFrontend::GetOutputVariable<int>();
-  	    *maxBeamSize = CudnnFrontend::GetOutputVariable<int>();
-      }
-      return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnGetAttnDescriptor");
+    if (CudnnFrontend::Success()) {
+        *attnMode =   CudnnFrontend::GetOutputVariable<unsigned>();
+        *nHeads = CudnnFrontend::GetOutputVariable<int>();
+        *smScaler =   CudnnFrontend::GetOutputVariable<double>();
+        *dataType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
+        *computePrec = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
+        *mathType = CudnnFrontend::GetOutputVariable<cudnnMathType_t>();
+        *attnDropoutDesc = CudnnFrontend::GetOutputVariable<cudnnDropoutDescriptor_t>();
+        *postDropoutDesc = CudnnFrontend::GetOutputVariable<cudnnDropoutDescriptor_t>();
+        *qSize = CudnnFrontend::GetOutputVariable<int>();
+        *kSize = CudnnFrontend::GetOutputVariable<int>();
+        *vSize = CudnnFrontend::GetOutputVariable<int>();
+        *qProjSize = CudnnFrontend::GetOutputVariable<int>();
+        *vProjSize = CudnnFrontend::GetOutputVariable<int>();
+        *oProjSize = CudnnFrontend::GetOutputVariable<int>();
+        *qoMaxSeqLength = CudnnFrontend::GetOutputVariable<int>();
+        *kvMaxSeqLength = CudnnFrontend::GetOutputVariable<int>();
+        *maxBatchSize = CudnnFrontend::GetOutputVariable<int>();
+        *maxBeamSize = CudnnFrontend::GetOutputVariable<int>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetMultiHeadAttnBuffers(cudnnHandle_t handle,
@@ -4010,18 +4057,18 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetMultiHeadAttnBuffers(cudnnHandle_t 
                              					  size_t *reserveSpaceSizeInBytes) {
 
 
-     CudnnFrontend::Prepare();
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::AddDevicePointerForArguments(handle);
-     CudnnFrontend::AddDevicePointerForArguments(attnDesc);
-     
-     CudnnFrontend::Execute("cudnnGetMultiHeadAttnBuffers");
-      if (CudnnFrontend::Success()) {
-            *weightSizeInBytes       = CudnnFrontend::GetOutputVariable<size_t>();
-            *workSpaceSizeInBytes    = CudnnFrontend::GetOutputVariable<size_t>();
-            *reserveSpaceSizeInBytes = CudnnFrontend::GetOutputVariable<size_t>();
-      }
-      return CudnnFrontend::GetExitCode();
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(attnDesc);
+    
+    CudnnFrontend::Execute("cudnnGetMultiHeadAttnBuffers");
+    if (CudnnFrontend::Success()) {
+        *weightSizeInBytes       = CudnnFrontend::GetOutputVariable<size_t>();
+        *workSpaceSizeInBytes    = CudnnFrontend::GetOutputVariable<size_t>();
+        *reserveSpaceSizeInBytes = CudnnFrontend::GetOutputVariable<size_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetMultiHeadAttnWeights(cudnnHandle_t handle,
@@ -4032,21 +4079,20 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetMultiHeadAttnWeights(cudnnHandle_t 
                              					  cudnnTensorDescriptor_t wDesc,
                              					  void **wAddr) {
 
+    CudnnFrontend::Prepare();
 
-     CudnnFrontend::Prepare();
-
-     CudnnFrontend::AddDevicePointerForArguments(handle);
-     CudnnFrontend::AddDevicePointerForArguments(attnDesc);
-     CudnnFrontend::AddVariableForArguments<cudnnMultiHeadAttnWeightKind_t>(wKind);
-     CudnnFrontend::AddVariableForArguments<size_t>(weightSizeInBytes);
-     CudnnFrontend::AddHostPointerForArguments(weights);
-      
-     CudnnFrontend::Execute("cudnnGetMultiHeadAttnWeights");
-     if (CudnnFrontend::Success()) {
-         wDesc = CudnnFrontend::GetOutputVariable<cudnnTensorDescriptor_t>();
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(attnDesc);
+    CudnnFrontend::AddVariableForArguments<cudnnMultiHeadAttnWeightKind_t>(wKind);
+    CudnnFrontend::AddVariableForArguments<size_t>(weightSizeInBytes);
+    CudnnFrontend::AddHostPointerForArguments(weights);
+    
+    CudnnFrontend::Execute("cudnnGetMultiHeadAttnWeights");
+    if (CudnnFrontend::Success()) {
+        wDesc = CudnnFrontend::GetOutputVariable<cudnnTensorDescriptor_t>();
         *wAddr =  CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnMultiHeadAttnForward(cudnnHandle_t handle,
@@ -4098,13 +4144,13 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnMultiHeadAttnForward(cudnnHandle_t han
     CudnnFrontend::AddVariableForArguments<size_t>(reserveSpaceSizeInBytes);
     CudnnFrontend::AddHostPointerForArguments(reserveSpace);
 
-     CudnnFrontend::Execute("cudnnMultiHeadAttnForward");
-     if (CudnnFrontend::Success()) {
+    CudnnFrontend::Execute("cudnnMultiHeadAttnForward");
+    if (CudnnFrontend::Success()) {
         out = CudnnFrontend::GetOutputDevicePointer();
         workSpace = CudnnFrontend::GetOutputDevicePointer();
         reserveSpace = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnMultiHeadAttnBackwardData(cudnnHandle_t handle,
@@ -4155,8 +4201,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnMultiHeadAttnBackwardData(cudnnHandle_
     CudnnFrontend::AddVariableForArguments<size_t>(reserveSpaceSizeInBytes);
     CudnnFrontend::AddHostPointerForArguments(reserveSpace);
 
-     CudnnFrontend::Execute("cudnnMultiHeadAttnBackwardData");
-     if (CudnnFrontend::Success()) {
+    CudnnFrontend::Execute("cudnnMultiHeadAttnBackwardData");
+    if (CudnnFrontend::Success()) {
         dout = CudnnFrontend::GetOutputDevicePointer();
         dqueries = CudnnFrontend::GetOutputDevicePointer();
         dqueries = CudnnFrontend::GetOutputDevicePointer();
@@ -4164,8 +4210,8 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnMultiHeadAttnBackwardData(cudnnHandle_
         dvalues = CudnnFrontend::GetOutputDevicePointer();
         workSpace = CudnnFrontend::GetOutputDevicePointer();
         reserveSpace = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnMultiHeadAttnBackwardWeights(cudnnHandle_t handle,
@@ -4187,49 +4233,47 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnMultiHeadAttnBackwardWeights(cudnnHand
                                   				       size_t reserveSpaceSizeInBytes,
                                   				       void *reserveSpace) {
 
+    CudnnFrontend::Prepare();
 
-      CudnnFrontend::Prepare();
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(attnDesc);
+    CudnnFrontend::AddVariableForArguments<cudnnWgradMode_t>(addGrad);
+    CudnnFrontend::AddDevicePointerForArguments(qDesc);
+    CudnnFrontend::AddHostPointerForArguments(queries);
+    CudnnFrontend::AddDevicePointerForArguments(kDesc);
+    CudnnFrontend::AddHostPointerForArguments(keys);
+    CudnnFrontend::AddDevicePointerForArguments(vDesc);
+    CudnnFrontend::AddHostPointerForArguments(values);
+    CudnnFrontend::AddDevicePointerForArguments(doDesc);
+    CudnnFrontend::AddHostPointerForArguments(dout);
+    CudnnFrontend::AddVariableForArguments<size_t>(weightSizeInBytes);
+    CudnnFrontend::AddHostPointerForArguments(weights);
+    CudnnFrontend::AddVariableForArguments<size_t>(workSpaceSizeInBytes);
+    CudnnFrontend::AddHostPointerForArguments(workSpace);
+    CudnnFrontend::AddVariableForArguments<size_t>(reserveSpaceSizeInBytes);
+    CudnnFrontend::AddHostPointerForArguments(reserveSpace);
 
-      CudnnFrontend::AddDevicePointerForArguments(handle);
-      CudnnFrontend::AddDevicePointerForArguments(attnDesc);
-      CudnnFrontend::AddVariableForArguments<cudnnWgradMode_t>(addGrad);
-      CudnnFrontend::AddDevicePointerForArguments(qDesc);
-      CudnnFrontend::AddHostPointerForArguments(queries);
-      CudnnFrontend::AddDevicePointerForArguments(kDesc);
-      CudnnFrontend::AddHostPointerForArguments(keys);
-      CudnnFrontend::AddDevicePointerForArguments(vDesc);
-      CudnnFrontend::AddHostPointerForArguments(values);
-      CudnnFrontend::AddDevicePointerForArguments(doDesc);
-      CudnnFrontend::AddHostPointerForArguments(dout);
-      CudnnFrontend::AddVariableForArguments<size_t>(weightSizeInBytes);
-      CudnnFrontend::AddHostPointerForArguments(weights);
-      CudnnFrontend::AddVariableForArguments<size_t>(workSpaceSizeInBytes);
-      CudnnFrontend::AddHostPointerForArguments(workSpace);
-      CudnnFrontend::AddVariableForArguments<size_t>(reserveSpaceSizeInBytes);
-      CudnnFrontend::AddHostPointerForArguments(reserveSpace);
-
-       CudnnFrontend::Execute("cudnnMultiHeadAttnBackwardWeights");
-     if (CudnnFrontend::Success()) {
+    CudnnFrontend::Execute("cudnnMultiHeadAttnBackwardWeights");
+    if (CudnnFrontend::Success()) {
         dweights = CudnnFrontend::GetOutputDevicePointer();
         workSpace = CudnnFrontend::GetOutputDevicePointer();
         reserveSpace = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateCTCLossDescriptor(cudnnCTCLossDescriptor_t *ctcLossDesc) {
 
-     CudnnFrontend::Prepare();
-     
-     CudnnFrontend::Execute("cudnnCreateCTCLossDescriptor");
-     if (CudnnFrontend::Success()) {
-         *ctcLossDesc = CudnnFrontend::GetOutputVariable<cudnnCTCLossDescriptor_t>();
-     }
-     return CudnnFrontend::GetExitCode();      
+    CudnnFrontend::Prepare();
+    
+    CudnnFrontend::Execute("cudnnCreateCTCLossDescriptor");
+    if (CudnnFrontend::Success()) {
+        *ctcLossDesc = CudnnFrontend::GetOutputVariable<cudnnCTCLossDescriptor_t>();
+    }
+    return CudnnFrontend::GetExitCode();      
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetCTCLossDescriptor(cudnnCTCLossDescriptor_t ctcLossDesc, cudnnDataType_t compType) {
-
 
     CudnnFrontend::Prepare();
 
@@ -4246,7 +4290,6 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetCTCLossDescriptorEx(cudnnCTCLossDes
                                 				 cudnnDataType_t compType,
                             					 cudnnLossNormalizationMode_t normMode,
                             					 cudnnNanPropagation_t gradMode) {
-
 
      CudnnFrontend::Prepare();
 
@@ -4279,26 +4322,22 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetCTCLossDescriptorEx(cudnnCTCLossDes
                             					 cudnnLossNormalizationMode_t *normMode,
                             					 cudnnNanPropagation_t *gradMode) {
 
+    CudnnFrontend::Prepare();
 
-   CudnnFrontend::Prepare();
-
-
-   CudnnFrontend::AddDevicePointerForArguments(ctcLossDesc);
+    CudnnFrontend::AddDevicePointerForArguments(ctcLossDesc);
    
-   CudnnFrontend::Execute("cudnnGetCTCLossDescriptorEx");
-   if (CudnnFrontend::Success()) {
-      *compType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
-      *normMode = CudnnFrontend::GetOutputVariable<cudnnLossNormalizationMode_t>();
-      *gradMode = CudnnFrontend::GetOutputVariable<cudnnNanPropagation_t>();
-   } 
+    CudnnFrontend::Execute("cudnnGetCTCLossDescriptorEx");
+    if (CudnnFrontend::Success()) {
+        *compType = CudnnFrontend::GetOutputVariable<cudnnDataType_t>();
+        *normMode = CudnnFrontend::GetOutputVariable<cudnnLossNormalizationMode_t>();
+        *gradMode = CudnnFrontend::GetOutputVariable<cudnnNanPropagation_t>();
+    } 
    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnDestroyCTCLossDescriptor(cudnnCTCLossDescriptor_t ctcLossDesc) {
 
-
    CudnnFrontend::Prepare();
-
 
    CudnnFrontend::AddDevicePointerForArguments(ctcLossDesc);
 
@@ -4323,27 +4362,26 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnCTCLoss(cudnnHandle_t handle,
     						  void *workspace,
     						  size_t workSpaceSizeInBytes) { 
 
-
     CudnnFrontend::Prepare();
 
-     CudnnFrontend::AddDevicePointerForArguments(handle);
-     CudnnFrontend::AddDevicePointerForArguments(probsDesc);
-     CudnnFrontend::AddHostPointerForArguments(probs);
-     CudnnFrontend::AddHostPointerForArguments<int>((int*)labels);
-     CudnnFrontend::AddHostPointerForArguments<int>((int*)labelLengths);
-     CudnnFrontend::AddHostPointerForArguments<int>((int*)inputLengths);
-     CudnnFrontend::AddDevicePointerForArguments(gradientsDesc);
-     CudnnFrontend::AddVariableForArguments<cudnnCTCLossAlgo_t>(algo);
-     CudnnFrontend::AddDevicePointerForArguments(ctcLossDesc);
-     CudnnFrontend::AddHostPointerForArguments(workspace);
-     CudnnFrontend::AddVariableForArguments<size_t>(workSpaceSizeInBytes);
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(probsDesc);
+    CudnnFrontend::AddHostPointerForArguments(probs);
+    CudnnFrontend::AddHostPointerForArguments<int>((int*)labels);
+    CudnnFrontend::AddHostPointerForArguments<int>((int*)labelLengths);
+    CudnnFrontend::AddHostPointerForArguments<int>((int*)inputLengths);
+    CudnnFrontend::AddDevicePointerForArguments(gradientsDesc);
+    CudnnFrontend::AddVariableForArguments<cudnnCTCLossAlgo_t>(algo);
+    CudnnFrontend::AddDevicePointerForArguments(ctcLossDesc);
+    CudnnFrontend::AddHostPointerForArguments(workspace);
+    CudnnFrontend::AddVariableForArguments<size_t>(workSpaceSizeInBytes);
 
-     CudnnFrontend::Execute("cudnnCTCLoss");
-     if (CudnnFrontend::Success()) {
-          costs = CudnnFrontend::GetOutputDevicePointer();
-          gradients = CudnnFrontend::GetOutputDevicePointer();
-     }
-     return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnCTCLoss");
+    if (CudnnFrontend::Success()) {
+        costs = CudnnFrontend::GetOutputDevicePointer();
+        gradients = CudnnFrontend::GetOutputDevicePointer();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 #endif
 
@@ -4355,9 +4393,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetCTCLossWorkspaceSize(cudnnHandle_t 
     								  const int *inputLengths,                     
     								  cudnnCTCLossAlgo_t algo,                     
    	 							  cudnnCTCLossDescriptor_t ctcLossDesc,
-    								  size_t *sizeInBytes) { 
-
-    
+    								  size_t *sizeInBytes) {
  
     CudnnFrontend::Prepare();
 
@@ -4372,14 +4408,12 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetCTCLossWorkspaceSize(cudnnHandle_t 
     
     CudnnFrontend::Execute("cudnnGetCTCLossWorkspaceSize");
     if (CudnnFrontend::Success()) {
-         *sizeInBytes = CudnnFrontend::GetOutputVariable<size_t>();
-     }
-     return CudnnFrontend::GetExitCode();
+        *sizeInBytes = CudnnFrontend::GetOutputVariable<size_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetCallback(unsigned mask, void *udata, cudnnCallback_t fptr) {
-
-
     CudnnFrontend::Prepare();
 
     CudnnFrontend::AddVariableForArguments<unsigned>(mask);
@@ -4392,33 +4426,30 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetCallback(unsigned mask, void *udata
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetCallback(unsigned *mask, void **udata, cudnnCallback_t *fptr) {
+    CudnnFrontend::Prepare();
 
-
-   CudnnFrontend::Prepare();
-
-   CudnnFrontend::Execute("cudnnGetCallback");
-   if (CudnnFrontend::Success()) {
-       *mask = CudnnFrontend::GetOutputVariable<unsigned>();
-       *udata = CudnnFrontend::GetOutputDevicePointer();
-       *fptr  = CudnnFrontend::GetOutputVariable<cudnnCallback_t>();
-   }
-   return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Execute("cudnnGetCallback");
+    if (CudnnFrontend::Success()) {
+        *mask = CudnnFrontend::GetOutputVariable<unsigned>();
+        *udata = CudnnFrontend::GetOutputDevicePointer();
+        *fptr  = CudnnFrontend::GetOutputVariable<cudnnCallback_t>();
+    }
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnCreateFusedOpsConstParamPack(cudnnFusedOpsConstParamPack_t *constPack, cudnnFusedOps_t ops) {
-
-   CudnnFrontend::Prepare();
-
-   CudnnFrontend::AddHostPointerForArguments<cudnnFusedOpsConstParamPack_t>((cudnnFusedOpsConstParamPack_t*)constPack);
-   CudnnFrontend::AddVariableForArguments<cudnnFusedOps_t>(ops);
-
-   CudnnFrontend::Execute("cudnnCreateFusedOpsConstParamPack");
    
-   return CudnnFrontend::GetExitCode();
+    CudnnFrontend::Prepare();
+
+    CudnnFrontend::AddHostPointerForArguments<cudnnFusedOpsConstParamPack_t>((cudnnFusedOpsConstParamPack_t*)constPack);
+    CudnnFrontend::AddVariableForArguments<cudnnFusedOps_t>(ops);
+
+    CudnnFrontend::Execute("cudnnCreateFusedOpsConstParamPack");
+   
+    return CudnnFrontend::GetExitCode();
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnDestroyFusedOpsConstParamPack(cudnnFusedOpsConstParamPack_t constPack) {
-
 
    CudnnFrontend::Prepare();
 
@@ -5896,14 +5927,6 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnFusedOpsExecute(cudnnHandle_t handle, 
 #endif
 
 // TODO:
-extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendDestroyDescriptor(cudnnBackendDescriptor_t desc) {
-    CudnnFrontend::Prepare();
-    CudnnFrontend::AddDevicePointerForArguments(desc);
-    CudnnFrontend::Execute("cudnnBackendDestroyDescriptor");
-    return CudnnFrontend::GetExitCode();
-}
-
-// TODO:
 extern "C" size_t CUDNNWINAPI cudnnGetCudartVersion() {
     CudnnFrontend::Prepare();
     CudnnFrontend::Execute("cudnnGetCudartVersion");
@@ -5913,29 +5936,121 @@ extern "C" size_t CUDNNWINAPI cudnnGetCudartVersion() {
     return CudnnFrontend::GetExitCode();
 }
 
-// TODO:
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnBackendCreateDescriptor(
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendCreateDescriptor(
         cudnnBackendDescriptorType_t descriptorType,
         cudnnBackendDescriptor_t *descriptor) {
     CudnnFrontend::Prepare();
     CudnnFrontend::AddVariableForArguments<cudnnBackendDescriptorType_t>(descriptorType);
+    cout << "cudnnBackendCreateDescriptor called with descriptorType: " << descriptorType << endl;
     CudnnFrontend::Execute("cudnnBackendCreateDescriptor");
     if (CudnnFrontend::Success()) {
         *descriptor = CudnnFrontend::GetOutputVariable<cudnnBackendDescriptor_t>();
+        cout << "cudnnBackendCreateDescriptor created descriptor: " << *descriptor << endl;
     }
     return CudnnFrontend::GetExitCode();
 }
 
-// TODO:
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnBackendFinalize(cudnnBackendDescriptor_t descriptor) {
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendSetAttribute(cudnnBackendDescriptor_t descriptor,
+                                                            cudnnBackendAttributeName_t attributeName,
+                                                            cudnnBackendAttributeType_t attributeType,
+                                                            int64_t elementCount,
+                                                            const void *arrayOfElements) {
+    CudnnFrontend::Prepare();
+    CudnnFrontend::AddDevicePointerForArguments(descriptor);
+    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeName_t>(attributeName);
+    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeType_t>(attributeType);
+    CudnnFrontend::AddVariableForArguments<int64_t>(elementCount);
+
+    int64_t byteCount = elementCount * getCudnnTypeSize(attributeType);
+    CudnnFrontend::AddHostPointerForArguments<char>((char*) arrayOfElements, byteCount);
+
+    if (attributeName == CUDNN_ATTR_VARIANT_PACK_WORKSPACE &&
+        attributeType == CUDNN_TYPE_VOID_PTR) {
+            cout << "SETTING WORKSPACE POINTER TO" << endl;
+    }
+
+    cout << "cudnnBackendSetAttribute called with:" << endl;
+    cout << "descriptor: " << descriptor << endl;
+    cout << "attribute name: " << attributeName << endl;
+    cout << "attribute type: " << attributeType << endl;
+    cout << "element count: " << elementCount << endl;
+    cout << "byte count: " << byteCount << endl;
+    if (byteCount > 0) {
+        printHex(arrayOfElements, byteCount, "[FRONTEND] Sending bytes for cudnnBackendSetAttribute");
+    }
+    else {
+        cout << "[FRONTEND] No bytes to send for cudnnBackendSetAttribute" << endl;
+    }
+    CudnnFrontend::Execute("cudnnBackendSetAttribute");
+    return CudnnFrontend::GetExitCode();
+}
+
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendGetAttribute(cudnnBackendDescriptor_t descriptor,
+                                                            cudnnBackendAttributeName_t attributeName,
+                                                            cudnnBackendAttributeType_t attributeType,
+                                                            int64_t requestedElementCount,
+                                                            int64_t *elementCount,
+                                                            void *arrayOfElements) {
+
+    CudnnFrontend::Prepare();
+    CudnnFrontend::AddDevicePointerForArguments(descriptor);
+    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeName_t>(attributeName);
+    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeType_t>(attributeType);
+    CudnnFrontend::AddVariableForArguments<int64_t>(requestedElementCount);
+    // CudnnFrontend::AddHostPointerForArguments<int64_t>(elementCount);
+    CudnnFrontend::AddHostPointerForArguments<char>((char*)arrayOfElements, requestedElementCount * getCudnnTypeSize(attributeType));
+    cout << "cudnnBackendGetAttribute called with:" << endl;
+        cout << "descriptor: " << descriptor << endl;
+        cout << "attribute name: " << attributeName << endl;
+        cout << "attribute type: " << attributeType << endl;
+        cout << "requested element count: " << requestedElementCount << endl;
+    CudnnFrontend::Execute("cudnnBackendGetAttribute");
+    if (CudnnFrontend::Success()) {
+        cout << "cudnnBackendGetAttribute succeeded" << endl;
+        auto val = CudnnFrontend::GetOutputVariable<int64_t>();
+        cout << "val: " << val << endl;
+        int64_t elementsToWrite = std::min(val, requestedElementCount);
+        if (elementCount != nullptr) {
+            *elementCount = val;
+            cout << "setting elementCount to: " << val << endl;
+            cout << "elementCount: " << *elementCount << endl;
+        }
+        int64_t bytesToWrite = elementsToWrite * getCudnnTypeSize(attributeType);
+        cout << "elementsToWrite: " << elementsToWrite << endl;
+        cout << "bytesToWrite: " << bytesToWrite << endl;
+        if (bytesToWrite > 0 && arrayOfElements != nullptr) {
+            std::memcpy(arrayOfElements, CudnnFrontend::GetOutputHostPointer<char>(bytesToWrite), bytesToWrite);
+        }
+    }
+    return CudnnFrontend::GetExitCode();
+}
+
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendExecute(cudnnHandle_t handle, cudnnBackendDescriptor_t executionPlan, cudnnBackendDescriptor_t variantPack) {
+    cout << "cudnnBackendExecute called" << endl;
+    CudnnFrontend::Prepare();
+    CudnnFrontend::AddDevicePointerForArguments(handle);
+    CudnnFrontend::AddDevicePointerForArguments(executionPlan);
+    CudnnFrontend::AddDevicePointerForArguments(variantPack);
+    CudnnFrontend::Execute("cudnnBackendExecute");
+    return CudnnFrontend::GetExitCode();
+}
+
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendFinalize(cudnnBackendDescriptor_t descriptor) {
     CudnnFrontend::Prepare();
     CudnnFrontend::AddDevicePointerForArguments(descriptor);
     CudnnFrontend::Execute("cudnnBackendFinalize");
     return CudnnFrontend::GetExitCode();
-} // namespace Cudnn
+}
+
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendDestroyDescriptor(cudnnBackendDescriptor_t desc) {
+    CudnnFrontend::Prepare();
+    CudnnFrontend::AddDevicePointerForArguments(desc);
+    CudnnFrontend::Execute("cudnnBackendDestroyDescriptor");
+    return CudnnFrontend::GetExitCode();
+}
 
 // TODO:
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnCTCLoss(
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnCTCLoss(
     cudnnHandle_t                        handle,
     cudnnTensorDescriptor_t              probsDesc,
     const   void                        *probs,
@@ -5971,39 +6086,8 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnCTCLoss(
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnBackendExecute(cudnnHandle_t handle, cudnnBackendDescriptor_t executionPlan, cudnnBackendDescriptor_t varianPack) {
-    CudnnFrontend::Prepare();
-    CudnnFrontend::AddDevicePointerForArguments(handle);
-    CudnnFrontend::AddDevicePointerForArguments(executionPlan);
-    CudnnFrontend::AddDevicePointerForArguments(varianPack);
-    CudnnFrontend::Execute("cudnnBackendExecute");
-    return CudnnFrontend::GetExitCode();
-}
-
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnBackendGetAttribute(
-    cudnnBackendDescriptor_t descriptor,
-    cudnnBackendAttributeName_t attributeName,
-    cudnnBackendAttributeType_t attributeType,
-    int64_t requestedElementCount,
-    int64_t *elementCount,
-    void *arrayOfElements) {
-    CudnnFrontend::Prepare();
-    CudnnFrontend::AddDevicePointerForArguments(descriptor);
-    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeName_t>(attributeName);
-    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeType_t>(attributeType);
-    CudnnFrontend::AddVariableForArguments<int64_t>(requestedElementCount);
-    CudnnFrontend::AddHostPointerForArguments<int64_t>(elementCount);
-    CudnnFrontend::AddHostPointerForArguments(arrayOfElements);
-    CudnnFrontend::Execute("cudnnBackendGetAttribute");
-    if (CudnnFrontend::Success()) {
-        *elementCount = CudnnFrontend::GetOutputVariable<int64_t>();
-        std::memcpy(arrayOfElements, CudnnFrontend::GetOutputHostPointer<void>(requestedElementCount), requestedElementCount * sizeof(void*));
-    }
-    return CudnnFrontend::GetExitCode();
-}
-
 // TODO:
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnRNNBackwardData_v8(
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnRNNBackwardData_v8(
     cudnnHandle_t handle,
     cudnnRNNDescriptor_t rnnDesc,
     const int32_t devSeqLengths[],
@@ -6059,7 +6143,7 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnRNNBackwardData_v8(
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnCTCLoss_v8(cudnnHandle_t                        handle,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnCTCLoss_v8(cudnnHandle_t                        handle,
                                                     cudnnCTCLossAlgo_t                   algo,
                                                     const   cudnnCTCLossDescriptor_t     ctcLossDesc,
                                                     const   cudnnTensorDescriptor_t      probsDesc,
@@ -6094,7 +6178,7 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnCTCLoss_v8(cudnnHandle_t              
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnSetCTCLossDescriptor_v9(cudnnCTCLossDescriptor_t        ctcLossDesc,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetCTCLossDescriptor_v9(cudnnCTCLossDescriptor_t        ctcLossDesc,
                                     cudnnDataType_t                 compType,
                                     cudnnLossNormalizationMode_t    normMode,
                                     cudnnCTCGradMode_t              ctcGradMode,
@@ -6112,22 +6196,7 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnSetCTCLossDescriptor_v9(cudnnCTCLossDe
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnBackendSetAttribute(cudnnBackendDescriptor_t descriptor,
-                                                            cudnnBackendAttributeName_t attributeName,
-                                                            cudnnBackendAttributeType_t attributeType,
-                                                            int64_t elementCount,
-                                                            const void *arrayOfElements) {
-    CudnnFrontend::Prepare();
-    CudnnFrontend::AddDevicePointerForArguments(descriptor);
-    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeName_t>(attributeName);
-    CudnnFrontend::AddVariableForArguments<cudnnBackendAttributeType_t>(attributeType);
-    CudnnFrontend::AddVariableForArguments<int64_t>(elementCount);
-    CudnnFrontend::AddHostPointerForArguments(arrayOfElements);
-    CudnnFrontend::Execute("cudnnBackendSetAttribute");
-    return CudnnFrontend::GetExitCode();
-}
-
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnGetRNNWeightParams(cudnnHandle_t handle,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetRNNWeightParams(cudnnHandle_t handle,
                                                         cudnnRNNDescriptor_t rnnDesc,
                                                         int32_t pseudoLayer,
                                                         size_t weightSpaceSize,
@@ -6156,18 +6225,7 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnGetRNNWeightParams(cudnnHandle_t handl
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI void cudnnGetLastErrorString(char *message, size_t max_size) {
-    CudnnFrontend::Prepare();
-    CudnnFrontend::AddHostPointerForArguments<char>(message, max_size);
-    CudnnFrontend::Execute("cudnnGetLastErrorString");
-    if (CudnnFrontend::Success()) {
-        std::string errorMessage = CudnnFrontend::GetOutputVariable<std::string>();
-        std::strncpy(message, errorMessage.c_str(), max_size - 1);
-        message[max_size - 1] = '\0'; // Ensure null-termination
-    }
-}
-
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnRNNBackwardWeights_v8(cudnnHandle_t handle,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnRNNBackwardWeights_v8(cudnnHandle_t handle,
                                             cudnnRNNDescriptor_t rnnDesc,
                                             cudnnWgradMode_t addGrad,
                                             const int32_t devSeqLengths[],
@@ -6207,7 +6265,7 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnRNNBackwardWeights_v8(cudnnHandle_t ha
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnGetCTCLossWorkspaceSize_v8(cudnnHandle_t handle,
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetCTCLossWorkspaceSize_v8(cudnnHandle_t handle,
                                     cudnnCTCLossAlgo_t                   algo,
                                     const   cudnnCTCLossDescriptor_t     ctcLossDesc,
                                     const   cudnnTensorDescriptor_t      probsDesc,
@@ -6227,7 +6285,7 @@ extern "C" CUDNNWINAPI cudnnStatus_t cudnnGetCTCLossWorkspaceSize_v8(cudnnHandle
     return CudnnFrontend::GetExitCode();
 }
 
-extern "C" CUDNNWINAPI cudnnStatus_t cudnnGetProperty(libraryPropertyType type, int *value) {
+extern "C" cudnnStatus_t CUDNNWINAPI cudnnGetProperty(libraryPropertyType type, int *value) {
     CudnnFrontend::Prepare();
 
     CudnnFrontend::AddVariableForArguments<libraryPropertyType>(type);

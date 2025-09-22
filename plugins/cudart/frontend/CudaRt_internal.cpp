@@ -24,34 +24,11 @@
  *             Department of Applied Science
  */
 
-#include <cstdio>
-#include <elf.h>
-#include <CudaRt_internal.h>
 #include <lz4.h>
+#include <cstdio>
+#include <CudaRt_internal.h>
 
 #include "CudaRt.h"
-
-#define FATBINWRAPPER_MAGIC 0x466243B1
-#define FATBIN_MAGIC 0xBA55ED50
-#define ELF_MAGIC "\177ELF"
-#define ELF_MAGIC_SIZE 4
-
-typedef struct fatBinData  {
-    unsigned short kind;
-    unsigned short version;
-    unsigned int headerSize; // size of the header
-    unsigned int paddedPayloadSize;
-    unsigned int unknown0;
-    unsigned int payloadSize;
-    unsigned int unknown1;
-    unsigned int unknown2;
-    unsigned int smVersion;
-    unsigned int bitWidth;
-    unsigned int unknown3;
-    unsigned long unkown4;
-    unsigned long unknown5;
-    unsigned long uncompressedPayload;
-} fatBinData_t;
 
 // Helper: allocate and copy section headers table
 Elf64_Shdr* copySectionHeaders(const Elf64_Ehdr *eh) {
@@ -90,81 +67,8 @@ char* copySectionHeaderStrTable(const Elf64_Ehdr *eh, Elf64_Shdr *sh_table) {
     return sh_str;
 }
 
-
-// NEW ONE BUT NEEDS FIXING, IT DOES NOT WORK YET
-// void parseNvInfoSections(const Elf64_Ehdr *eh, Elf64_Shdr *sh_table, char *sh_str) {
-//     for (uint32_t i = 0; i < eh->e_shnum; i++) {
-//         char *sectionName = sh_str + sh_table[i].sh_name;
-//         if (strncmp(".nv.info.", sectionName, strlen(".nv.info.")) != 0) {
-//             continue;
-//         }
-
-//         char *funcName = sectionName + strlen(".nv.info.");
-//         byte *sectionData = (byte*)eh + sh_table[i].sh_offset;
-//         byte *sectionEnd  = sectionData + sh_table[i].sh_size;
-
-//         NVInfoFunction infoFunction;
-
-//         byte *p = sectionData;
-
-//         while (p < sectionEnd) {
-//             const NVInfoItemHeader *hdr = (const NVInfoItemHeader *)p;
-//             p += sizeof(NVInfoItemHeader);
-
-//             NVInfoItem item = {};
-//             item.format = hdr->format;
-//             item.attribute = hdr->attribute;
-
-//             switch (hdr->format) {
-//                 case EIFMT_SVAL: {
-//                     const  NVInfoSvalHeader *svalHdr = (const NVInfoSvalHeader *)p;
-//                     uint16_t valSize = svalHdr->value_size;
-//                     p += sizeof(NVInfoSvalHeader);
-
-//                     if (hdr->attribute == EIATTR_KPARAM_INFO) {
-//                         // parse NvInfoKParamInfoValue (12 bytes)
-//                         const NVInfoKParamInfoValue *param = (const NVInfoKParamInfoValue *)p;
-//                         item.type = NVInfoItem::KPARAM_INFO;
-//                         item.kparam = *param;
-//                         infoFunction.params.push_back(*param);
-//                     } else if (hdr->attribute == EIATTR_EXTERNS) {
-//                         // extern name (null-terminated string)
-//                         item.type = NVInfoItem::EXTERN;
-//                         item.extern_name = std::string((const char *)p, valSize);
-//                     } else {
-//                         item.type = NVInfoItem::OTHER;
-//                     }
-//                     // skip this sval
-//                     p += valSize;
-//                     break;
-//                 }
-//                 case EIFMT_NVAL: {
-//                     item.type = NVInfoItem::NO_VALUE;
-//                     p += 0;
-//                     break;
-//                 }
-//                 case EIFMT_BVAL: {
-//                     item.type = NVInfoItem::BVAL;
-//                     item.uval = *(const uint8_t *)p;
-//                     p += 1;
-//                     break;
-//                 }
-//                 case EIFMT_HVAL: {
-//                     item.type = NVInfoItem::HVAL;
-//                     item.uval = *(const uint16_t *)p;
-//                     p += 2;
-//                     break;
-//                 }
-//                 default:
-//                     throw std::runtime_error(std::string("Unknown NVInfo format ") + std::to_string(hdr->format));
-//             }
-//         }
-//         CudaRtFrontend::addDeviceFunc2InfoFunc(funcName, infoFunction);
-//     }
-// }
-
-// Helper: parse NvInfo sections and register functions
-void parseNvInfoSections(const Elf64_Ehdr *eh, Elf64_Shdr *sh_table, char *sh_str) {
+// Helper: parse NvInfo sections and register functions and their parameters
+void parseNvInfoKParams(const Elf64_Ehdr *eh, Elf64_Shdr *sh_table, char *sh_str) {
     byte *baseAddr = (byte *)eh;
     // cout << "Processing " << eh->e_shnum << " sections." << endl;
     for (uint32_t i = 0; i < eh->e_shnum; i++) {
@@ -194,14 +98,41 @@ void parseNvInfoSections(const Elf64_Ehdr *eh, Elf64_Shdr *sh_table, char *sh_st
                 size += pAttr->value;
             }
             if (pAttr->attr == EIATTR_KPARAM_INFO) {
+                // cout << "Attribute is a KParam info." << endl;
                 NvInfoKParam *nvInfoKParam = (NvInfoKParam *)pAttr;
                 infoFunction.params.push_back(*nvInfoKParam);
+                // cout << nvInfoKParam->index << ", "
+                //      << nvInfoKParam->ordinal << ", "
+                //      << nvInfoKParam->offset << ", "
+                //      << nvInfoKParam->log_alignment() << ", "
+                //      << nvInfoKParam->space() << ", "
+                //      << nvInfoKParam->cbank() << ", "
+                //      << nvInfoKParam->is_cbank() << ", "
+                //      << nvInfoKParam->size_bytes() << endl;
             }
-            // cout << "Attribute size: " << size << endl;
             pAttr = (NvInfoAttribute *)((byte *)pAttr + size);
         }
         CudaRtFrontend::addDeviceFunc2InfoFunc(funcName, infoFunction);
     }
+}
+
+void writeCudaFatBinaryToFile(const void *data, const unsigned long long int fatBinSize, const std::string &filename) {
+    FILE *file = fopen(filename.c_str(), "rb");
+    if (file) {
+        // File already exists, skip writing
+        fclose(file);
+        return;
+    }
+    file = fopen(filename.c_str(), "wb");
+    if (!file) {
+        perror("Failed to open file for writing");
+        return;
+    }
+    size_t written = fwrite(data, 1, fatBinSize, file);
+    if (written != fatBinSize) {
+        perror("Failed to write fat binary to file");
+    }
+    fclose(file);
 }
 
 /*
@@ -218,39 +149,52 @@ extern "C" __host__ void **__cudaRegisterFatBinary(void *fatCubin) {
     }
     // cout << "Fat binary wrapper magic: " << hex << bin->magic << endl;
     struct fatBinaryHeader *fatBinHdr = (struct fatBinaryHeader *)bin->data;
-    if (fatBinHdr->magic != FATBIN_MAGIC) {
-        cerr << "*** Error: Invalid fat binary magic number" << endl;
+    if (fatBinHdr->magic != FATBIN_MAGIC || fatBinHdr->version != 1) {
+        cerr << "*** Error: Invalid fat binary" << endl;
         return nullptr; // Not a valid fat binary
     }
     // cout << "Fat binary header size: " << fatBinHdr->headerSize << endl;
     // cout << "Fat binary size: " << fatBinHdr->fatSize << endl;
 
+    // only for debugging purposes
+    // writeCudaFatBinaryToFile(fatBinHdr, fatBinHdr->headerSize + fatBinHdr->fatSize, "fat_binary.cubin");
+
     uint8_t* data_ptr = (uint8_t*) bin->data + fatBinHdr->headerSize;
     size_t remaining_size = fatBinHdr->fatSize;
+    
     std::vector<char> cubin;
     while (remaining_size > 0) {
         fatBinData_t *fatBinData = (fatBinData_t *)data_ptr;
+        if (fatBinData->version != 0x0101 || (fatBinData->kind != 1 && fatBinData->kind != 2)) {
+            cerr << "*** Error: Invalid fat binary data version or kind" << endl;
+            return nullptr; // Not a valid fat binary data
+        }
+
+        // cout << "Processing fat binary data of kind: " << fatBinData->kind 
+        //     << " and smVersion: " << fatBinData->smVersion << endl;
+
         data_ptr += fatBinData->headerSize;
 
         if (fatBinData->uncompressedPayload != 0) {
-            uint8_t* compressed_data = data_ptr;
+            const char* compressed_data = (char*) data_ptr;
             int compressed_size = fatBinData->payloadSize;
+            data_ptr += fatBinData->paddedPayloadSize;
             
             // Prepare output buffer with the expected decompressed size
             cubin.resize(fatBinData->uncompressedPayload);
 
             // Decompress - LZ4_decompress_safe returns decompressed size or < 0 on error
             int decompressed_size = LZ4_decompress_safe(
-                (const char*)compressed_data,
+                compressed_data,
                 cubin.data(),
                 compressed_size,
                 fatBinData->uncompressedPayload
             );
+
             if (decompressed_size < 0) {
                 cerr << "*** Error: LZ4 decompression failed with code " << decompressed_size << endl;
                 return nullptr; // Decompression failed
             }
-            data_ptr += fatBinData->paddedPayloadSize;
         } else {
             cubin.resize(fatBinData->paddedPayloadSize);
             memcpy(cubin.data(), data_ptr, fatBinData->paddedPayloadSize);
@@ -272,13 +216,13 @@ extern "C" __host__ void **__cudaRegisterFatBinary(void *fatCubin) {
                 free(sh_table);
                 return nullptr;
             }
-            
-            parseNvInfoSections(eh, sh_table, sh_str);
+
+            parseNvInfoKParams(eh, sh_table, sh_str);
 
             free(sh_str);
             free(sh_table);
         }
-        remaining_size -= (fatBinData->paddedPayloadSize + fatBinData->headerSize);
+        remaining_size -= (fatBinData->headerSize + fatBinData->paddedPayloadSize);
     }
 
     Buffer *input_buffer = new Buffer();
@@ -289,8 +233,8 @@ extern "C" __host__ void **__cudaRegisterFatBinary(void *fatCubin) {
     CudaRtFrontend::Execute("cudaRegisterFatBinary", input_buffer);
     if (CudaRtFrontend::Success())
         return (void **) fatCubin;
-    
-  return nullptr;
+
+    return nullptr;
 }
 
 extern "C" __host__ void **__cudaRegisterFatBinaryEnd(void *fatCubin) {
