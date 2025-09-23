@@ -177,8 +177,8 @@ CUDA_DRIVER_HANDLER(LaunchKernel){
     void *kernelParams = input_buffer->Get<void *>();
     LOG4CPLUS_DEBUG(logger,"LaunchKernel: DDD");
     void *extra = input_buffer->Get<void *>();
-    LOG4CPLUS_DEBUG(logger,"LaunchKernel: all parameters read");
+    // LOG4CPLUS_DEBUG(logger,"LaunchKernel: all parameters read");
     CUresult exit_code = cuLaunchKernel((CUfunction)f,gridDimX,gridDimY,gridDimZ,blockDimX,blockDimY,blockDimZ,sharedMemBytes,hstream,NULL,(void **) &extra);
-    LOG4CPLUS_DEBUG(logger,"End LaunchKernel");
+    // LOG4CPLUS_DEBUG(logger,"End LaunchKernel");
     return std::make_shared<Result>((cudaError_t) exit_code);
 }

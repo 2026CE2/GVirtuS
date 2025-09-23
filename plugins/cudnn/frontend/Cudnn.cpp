@@ -37,12 +37,12 @@ static std::unordered_map<void*, bool> desc_is_float_map;
 
 void printHex(const void* data, size_t length, const std::string& label) {
     auto bytes = reinterpret_cast<const unsigned char*>(data);
-    std::// cout << label << " (" << length << " bytes): ";
+    // std:: cout << label << " (" << length << " bytes): ";
     for (size_t i = 0; i < length; i++) {
         printf("%02X ", bytes[i]);  // print each byte as two-digit hex
-        if ((i + 1) % 16 == 0) std::// cout << std::endl << "   "; // break lines for readability
+        if ((i + 1) % 16 == 0) std:: cout << std::endl << "   "; // break lines for readability
     }
-    // std::cout << std::endl;
+    // std:: cout << std::endl;
 }
 
 size_t getCudnnTypeSize(cudnnBackendAttributeType_t type) {

@@ -125,7 +125,7 @@ CUDA_ROUTINE_HANDLER(FuncSetCacheConfig) {
         // cout << "Stream: " << stream << endl;
 
         cudaError_t exit_code = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream);
-        LOG4CPLUS_DEBUG(logger, "LaunchKernel exit_code: " << exit_code);
+        // LOG4CPLUS_DEBUG(logger, "LaunchKernel exit_code: " << exit_code);
         return std::make_shared<Result>(exit_code);
     }
 #endif
