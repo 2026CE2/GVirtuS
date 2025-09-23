@@ -37,12 +37,12 @@ static std::unordered_map<void*, bool> desc_is_float_map;
 
 void printHex(const void* data, size_t length, const std::string& label) {
     auto bytes = reinterpret_cast<const unsigned char*>(data);
-    std::cout << label << " (" << length << " bytes): ";
+    std::// cout << label << " (" << length << " bytes): ";
     for (size_t i = 0; i < length; i++) {
         printf("%02X ", bytes[i]);  // print each byte as two-digit hex
-        if ((i + 1) % 16 == 0) std::cout << std::endl << "   "; // break lines for readability
+        if ((i + 1) % 16 == 0) std::// cout << std::endl << "   "; // break lines for readability
     }
-    std::cout << std::endl;
+    // std::cout << std::endl;
 }
 
 size_t getCudnnTypeSize(cudnnBackendAttributeType_t type) {
@@ -230,9 +230,9 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnSetTensorNdDescriptor(cudnnTensorDescr
 
     CudnnFrontend::Execute("cudnnSetTensorNdDescriptor");
     if (CudnnFrontend::Success()) {
-        cout << "Successfully set tensor descriptor " << tensorDesc << " with data type " << dataType << endl;
+        // cout << "Successfully set tensor descriptor " << tensorDesc << " with data type " << dataType << endl;
         registerDescriptorType(tensorDesc, dataType);
-        cout << "isFloatDescriptor: " << isFloatDescriptor(tensorDesc) << endl;
+        // cout << "isFloatDescriptor: " << isFloatDescriptor(tensorDesc) << endl;
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -5999,25 +5999,25 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendGetAttribute(cudnnBackendDescri
     CudnnFrontend::AddVariableForArguments<int64_t>(requestedElementCount);
     // CudnnFrontend::AddHostPointerForArguments<int64_t>(elementCount);
     CudnnFrontend::AddHostPointerForArguments<char>((char*)arrayOfElements, requestedElementCount * getCudnnTypeSize(attributeType));
-    cout << "cudnnBackendGetAttribute called with:" << endl;
-        cout << "descriptor: " << descriptor << endl;
-        cout << "attribute name: " << attributeName << endl;
-        cout << "attribute type: " << attributeType << endl;
-        cout << "requested element count: " << requestedElementCount << endl;
+    // cout << "cudnnBackendGetAttribute called with:" << endl;
+    //     cout << "descriptor: " << descriptor << endl;
+    //     cout << "attribute name: " << attributeName << endl;
+    //     cout << "attribute type: " << attributeType << endl;
+    //     cout << "requested element count: " << requestedElementCount << endl;
     CudnnFrontend::Execute("cudnnBackendGetAttribute");
     if (CudnnFrontend::Success()) {
-        cout << "cudnnBackendGetAttribute succeeded" << endl;
+        // cout << "cudnnBackendGetAttribute succeeded" << endl;
         auto val = CudnnFrontend::GetOutputVariable<int64_t>();
-        cout << "val: " << val << endl;
+        // cout << "val: " << val << endl;
         int64_t elementsToWrite = std::min(val, requestedElementCount);
         if (elementCount != nullptr) {
             *elementCount = val;
-            cout << "setting elementCount to: " << val << endl;
-            cout << "elementCount: " << *elementCount << endl;
+            // cout << "setting elementCount to: " << val << endl;
+            // cout << "elementCount: " << *elementCount << endl;
         }
         int64_t bytesToWrite = elementsToWrite * getCudnnTypeSize(attributeType);
-        cout << "elementsToWrite: " << elementsToWrite << endl;
-        cout << "bytesToWrite: " << bytesToWrite << endl;
+        // cout << "elementsToWrite: " << elementsToWrite << endl;
+        // cout << "bytesToWrite: " << bytesToWrite << endl;
         if (bytesToWrite > 0 && arrayOfElements != nullptr) {
             std::memcpy(arrayOfElements, CudnnFrontend::GetOutputHostPointer<char>(bytesToWrite), bytesToWrite);
         }
@@ -6026,7 +6026,7 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendGetAttribute(cudnnBackendDescri
 }
 
 extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendExecute(cudnnHandle_t handle, cudnnBackendDescriptor_t executionPlan, cudnnBackendDescriptor_t variantPack) {
-    cout << "cudnnBackendExecute called" << endl;
+    // cout << "cudnnBackendExecute called" << endl;
     CudnnFrontend::Prepare();
     CudnnFrontend::AddDevicePointerForArguments(handle);
     CudnnFrontend::AddDevicePointerForArguments(executionPlan);

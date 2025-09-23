@@ -87,7 +87,7 @@ std::shared_ptr<Result> CudaRtHandler::Execute(
     std::string routine, std::shared_ptr<Buffer> input_buffer) {
     map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
     it = mspHandlers->find(routine);
-    LOG4CPLUS_DEBUG(logger, "Called: " << routine);
+    // LOG4CPLUS_DEBUG(logger, "Called: " << routine);
     if (it == mspHandlers->end()) throw runtime_error("No handler for '" + routine + "' found!");
     return it->second(this, input_buffer);
 }
@@ -99,8 +99,8 @@ void CudaRtHandler::RegisterFatBinary(std::string &handler,
         mpFatBinary->erase(it);
     }
     mpFatBinary->insert(make_pair(handler, fatCubinHandle));
-    LOG4CPLUS_DEBUG(logger, "Registered FatBinary "
-                            << fatCubinHandle << " with handler " << handler);
+    // LOG4CPLUS_DEBUG(logger, "Registered FatBinary "
+    //                         << fatCubinHandle << " with handler " << handler);
 }
 
 void CudaRtHandler::RegisterFatBinary(const char *handler,
@@ -139,8 +139,8 @@ void CudaRtHandler::RegisterDeviceFunction(std::string &handler,
     map<string, string>::iterator it = mpDeviceFunction->find(handler);
     if (it != mpDeviceFunction->end()) mpDeviceFunction->erase(it);
     mpDeviceFunction->insert(make_pair(handler, function));
-    LOG4CPLUS_DEBUG(logger, "Registered DeviceFunction "
-                                << function << " with handler " << handler);
+    // LOG4CPLUS_DEBUG(logger, "Registered DeviceFunction "
+    //                             << function << " with handler " << handler);
 }
 
 void CudaRtHandler::RegisterDeviceFunction(const char *handler,
@@ -164,17 +164,17 @@ const char *CudaRtHandler::GetDeviceFunction(const char *handler) {
 
 void CudaRtHandler::RegisterVar(string &handler, string &symbol) {
     logger = Logger::getInstance(LOG4CPLUS_TEXT("RegisterVar"));
-    LOG4CPLUS_DEBUG(logger, "Registering Var " << symbol
-                                << " with handler " << handler);
+    // LOG4CPLUS_DEBUG(logger, "Registering Var " << symbol
+    //                             << " with handler " << handler);
     mpVar->insert(make_pair(handler, symbol));
-    LOG4CPLUS_DEBUG(logger,
-                    "Registered Var " << symbol << " with handler " << handler);
+    // LOG4CPLUS_DEBUG(logger,
+    //                 "Registered Var " << symbol << " with handler " << handler);
 }
 
 void CudaRtHandler::RegisterVar(const char *handler, const char *symbol) {
     logger = Logger::getInstance(LOG4CPLUS_TEXT("RegisterVar"));
-    LOG4CPLUS_DEBUG(logger, "Registering Var " << symbol
-                                << " with handler " << handler);
+    // LOG4CPLUS_DEBUG(logger, "Registering Var " << symbol
+    //                             << " with handler " << handler);
     string tmp1(handler);
     string tmp2(symbol);
     RegisterVar(tmp1, tmp2);

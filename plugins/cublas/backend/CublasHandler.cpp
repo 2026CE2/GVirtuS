@@ -60,7 +60,7 @@ bool CublasHandler::CanExecute(std::string routine) {
 }
 
 std::shared_ptr<Result> CublasHandler::Execute(std::string routine, std::shared_ptr<Buffer> input_buffer) {
- LOG4CPLUS_DEBUG(logger, "Called " << routine);
+//  LOG4CPLUS_DEBUG(logger, "Called " << routine);
   map<string, CublasHandler::CublasRoutineHandler>::iterator it;
   it = mspHandlers->find(routine);
   if (it == mspHandlers->end())

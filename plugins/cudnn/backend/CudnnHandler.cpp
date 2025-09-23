@@ -36,12 +36,12 @@ static std::unordered_map<void*, bool> desc_is_float_map;
 
 void printHex(const void* data, size_t length, const std::string& label) {
     auto bytes = reinterpret_cast<const unsigned char*>(data);
-    std::cout << label << " (" << length << " bytes): ";
+    // std:: cout << label << " (" << length << " bytes): ";
     for (size_t i = 0; i < length; i++) {
         printf("%02X ", bytes[i]);  // print each byte as two-digit hex
         if ((i + 1) % 16 == 0) std::cout << std::endl << "   "; // break lines for readability
     }
-    std::cout << std::endl;
+    // std::cout << std::endl;
 }
 
 size_t getCudnnTypeSize(cudnnBackendAttributeType_t type) {
@@ -134,7 +134,7 @@ bool CudnnHandler::CanExecute(std::string routine) {
 }
 
 std::shared_ptr<Result> CudnnHandler::Execute(std::string routine, std::shared_ptr<Buffer> input_buffer) {
-    LOG4CPLUS_DEBUG(logger,"Called " << routine);
+    // LOG4CPLUS_DEBUG(logger,"Called " << routine);
     map<string, CudnnHandler::CudnnRoutineHandler>::iterator it;
     it = mspHandlers->find(routine);
     if (it == mspHandlers->end())
@@ -4154,7 +4154,7 @@ CUDNN_ROUTINE_HANDLER(BackendSetAttribute) {
 
     cudnnStatus_t cs = cudnnBackendSetAttribute(backendDesc, attrName, attrType, elementCount, arrayOfElements);
 
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendSetAttribute Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendSetAttribute Executed");
     
     return std::make_shared<Result>(cs);
 }
@@ -4177,7 +4177,7 @@ CUDNN_ROUTINE_HANDLER(BackendGetAttribute) {
 
     cudnnStatus_t cs = cudnnBackendGetAttribute(backendDesc, attrName, attrType, requestedElementCount, &elementCount, arrayOfElements);
 
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute Executed");
     if (cs != CUDNN_STATUS_SUCCESS) {
         // LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute failed with status: " << cudnnGetErrorString(cs));
         return std::make_shared<Result>(cs);

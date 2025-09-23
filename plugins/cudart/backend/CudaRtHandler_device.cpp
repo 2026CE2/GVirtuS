@@ -221,13 +221,13 @@ CUDA_ROUTINE_HANDLER(GetDevice) {
   try {
     int device;
     cudaError_t exit_code = cudaGetDevice(&device);
-    LOG4CPLUS_DEBUG(logger, "GetDevice executed. Device: " << device);
+    // LOG4CPLUS_DEBUG(logger, "GetDevice executed. Device: " << device);
     std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
     out->Add<int>(device);
-    LOG4CPLUS_DEBUG(logger, "added device to out buffer");
+    // LOG4CPLUS_DEBUG(logger, "added device to out buffer");
     return std::make_shared<Result>(exit_code, out);
   } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
     return std::make_shared<Result>(cudaErrorMemoryAllocation);
   }
 }

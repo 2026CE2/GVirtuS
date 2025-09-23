@@ -62,7 +62,7 @@ bool CudaDrHandler::CanExecute(std::string routine) {
 
 std::shared_ptr<Result> CudaDrHandler::Execute(std::string routine, std::shared_ptr<Buffer> input_buffer) {
     map<string, CudaDrHandler::CudaDriverHandler>::iterator it;
-    LOG4CPLUS_DEBUG(logger, "Called " << routine);
+    // LOG4CPLUS_DEBUG(logger, "Called " << routine);
 
     it = mspHandlers->find(routine);
     if (it == mspHandlers->end())
@@ -76,7 +76,7 @@ void CudaDrHandler::RegisterFatBinary(std::string& handler, void ** fatCubinHand
         mpFatBinary->erase(it);
     }
     mpFatBinary->insert(make_pair(handler, fatCubinHandle));
-    LOG4CPLUS_DEBUG(logger, "Registered FatBinary " << fatCubinHandle << " with handler " << handler);
+    // LOG4CPLUS_DEBUG(logger, "Registered FatBinary " << fatCubinHandle << " with handler " << handler);
 }
 
 void CudaDrHandler::RegisterFatBinary(const char* handler, void ** fatCubinHandle) {
@@ -115,7 +115,7 @@ void CudaDrHandler::RegisterDeviceFunction(std::string & handler, std::string & 
     if (it != mpDeviceFunction->end())
         mpDeviceFunction->erase(it);
     mpDeviceFunction->insert(make_pair(handler, function));
-    LOG4CPLUS_DEBUG(logger, "Registered DeviceFunction " << function << " with handler " << handler);
+    // LOG4CPLUS_DEBUG(logger, "Registered DeviceFunction " << function << " with handler " << handler);
 }
 
 void CudaDrHandler::RegisterDeviceFunction(const char * handler, const char * function) {
@@ -138,7 +138,7 @@ const char *CudaDrHandler::GetDeviceFunction(const char * handler) {
 
 void CudaDrHandler::RegisterVar(string & handler, string & symbol) {
     mpVar->insert(make_pair(handler, symbol));
-    LOG4CPLUS_DEBUG(logger,"Registered Var " << symbol << " with handler " << handler );
+    // LOG4CPLUS_DEBUG(logger,"Registered Var " << symbol << " with handler " << handler );
 }
 
 void CudaDrHandler::RegisterVar(const char* handler, const char* symbol) {
