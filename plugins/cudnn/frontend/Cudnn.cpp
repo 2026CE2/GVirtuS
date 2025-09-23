@@ -5941,11 +5941,11 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendCreateDescriptor(
         cudnnBackendDescriptor_t *descriptor) {
     CudnnFrontend::Prepare();
     CudnnFrontend::AddVariableForArguments<cudnnBackendDescriptorType_t>(descriptorType);
-    cout << "cudnnBackendCreateDescriptor called with descriptorType: " << descriptorType << endl;
+    // cout << "cudnnBackendCreateDescriptor called with descriptorType: " << descriptorType << endl;
     CudnnFrontend::Execute("cudnnBackendCreateDescriptor");
     if (CudnnFrontend::Success()) {
         *descriptor = CudnnFrontend::GetOutputVariable<cudnnBackendDescriptor_t>();
-        cout << "cudnnBackendCreateDescriptor created descriptor: " << *descriptor << endl;
+        // cout << "cudnnBackendCreateDescriptor created descriptor: " << *descriptor << endl;
     }
     return CudnnFrontend::GetExitCode();
 }
@@ -5966,15 +5966,15 @@ extern "C" cudnnStatus_t CUDNNWINAPI cudnnBackendSetAttribute(cudnnBackendDescri
 
     if (attributeName == CUDNN_ATTR_VARIANT_PACK_WORKSPACE &&
         attributeType == CUDNN_TYPE_VOID_PTR) {
-            cout << "SETTING WORKSPACE POINTER TO" << endl;
+            // cout << "SETTING WORKSPACE POINTER TO" << endl;
     }
 
-    cout << "cudnnBackendSetAttribute called with:" << endl;
-    cout << "descriptor: " << descriptor << endl;
-    cout << "attribute name: " << attributeName << endl;
-    cout << "attribute type: " << attributeType << endl;
-    cout << "element count: " << elementCount << endl;
-    cout << "byte count: " << byteCount << endl;
+    // cout << "cudnnBackendSetAttribute called with:" << endl;
+    // cout << "descriptor: " << descriptor << endl;
+    // cout << "attribute name: " << attributeName << endl;
+    // cout << "attribute type: " << attributeType << endl;
+    // cout << "element count: " << elementCount << endl;
+    // cout << "byte count: " << byteCount << endl;
     if (byteCount > 0) {
         printHex(arrayOfElements, byteCount, "[FRONTEND] Sending bytes for cudnnBackendSetAttribute");
     }

@@ -4122,7 +4122,7 @@ CUDNN_ROUTINE_HANDLER(BackendCreateDescriptor) {
         return std::make_shared<Result>(cs);
     }
 
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendCreateDescriptor Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendCreateDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4136,12 +4136,12 @@ CUDNN_ROUTINE_HANDLER(BackendSetAttribute) {
     int64_t elementCount = in->Get<int64_t>();
     int64_t byteCount = elementCount * getCudnnTypeSize(attrType);
     void *arrayOfElements = in->Assign<char>(byteCount);
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendSetAttribute called with:");
-    LOG4CPLUS_DEBUG(logger, "Backend Descriptor: " << backendDesc);
-    LOG4CPLUS_DEBUG(logger, "Attribute Name: " << attrName);
-    LOG4CPLUS_DEBUG(logger, "Attribute Type: " << attrType);
-    LOG4CPLUS_DEBUG(logger, "Element Count: " << elementCount);
-    LOG4CPLUS_DEBUG(logger, "Byte Count: " << byteCount);
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendSetAttribute called with:");
+    // LOG4CPLUS_DEBUG(logger, "Backend Descriptor: " << backendDesc);
+    // LOG4CPLUS_DEBUG(logger, "Attribute Name: " << attrName);
+    // LOG4CPLUS_DEBUG(logger, "Attribute Type: " << attrType);
+    // LOG4CPLUS_DEBUG(logger, "Element Count: " << elementCount);
+    // LOG4CPLUS_DEBUG(logger, "Byte Count: " << byteCount);
     if (attrName == CUDNN_ATTR_VARIANT_PACK_WORKSPACE) {
         LOG4CPLUS_DEBUG(logger, "[BACKEND] Setting variant pack workspace attribute");
     }
@@ -4169,31 +4169,31 @@ CUDNN_ROUTINE_HANDLER(BackendGetAttribute) {
     int64_t elementCount;
     void *arrayOfElements = in->Assign<char>(requestedElementCount * getCudnnTypeSize(attrType));
 
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute called with:");
-    LOG4CPLUS_DEBUG(logger, "Backend Descriptor: " << backendDesc);
-    LOG4CPLUS_DEBUG(logger, "Attribute Name: " << attrName);
-    LOG4CPLUS_DEBUG(logger, "Attribute Type: " << attrType);
-    LOG4CPLUS_DEBUG(logger, "requestedElementCount: " << requestedElementCount);
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute called with:");
+    // LOG4CPLUS_DEBUG(logger, "Backend Descriptor: " << backendDesc);
+    // LOG4CPLUS_DEBUG(logger, "Attribute Name: " << attrName);
+    // LOG4CPLUS_DEBUG(logger, "Attribute Type: " << attrType);
+    // LOG4CPLUS_DEBUG(logger, "requestedElementCount: " << requestedElementCount);
 
     cudnnStatus_t cs = cudnnBackendGetAttribute(backendDesc, attrName, attrType, requestedElementCount, &elementCount, arrayOfElements);
 
     LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute Executed");
     if (cs != CUDNN_STATUS_SUCCESS) {
-        LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute failed with status: " << cudnnGetErrorString(cs));
+        // LOG4CPLUS_DEBUG(logger, "cudnnBackendGetAttribute failed with status: " << cudnnGetErrorString(cs));
         return std::make_shared<Result>(cs);
     }
 
     std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
     try {
         out->Add<int64_t>(elementCount);
-        LOG4CPLUS_DEBUG(logger, "Element Count: " << elementCount);
+        // LOG4CPLUS_DEBUG(logger, "Element Count: " << elementCount);
         int64_t elementsToWrite = std::min(requestedElementCount, elementCount);
-        LOG4CPLUS_DEBUG(logger, "Elements to write: " << elementsToWrite);
+        // LOG4CPLUS_DEBUG(logger, "Elements to write: " << elementsToWrite);
         if (elementsToWrite > 0) {
             out->Add<char>((char*) arrayOfElements, elementsToWrite * getCudnnTypeSize(attrType));
         }
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
         return std::make_shared<Result>(CUDNN_STATUS_INTERNAL_ERROR);
     }
 
@@ -4217,7 +4217,7 @@ CUDNN_ROUTINE_HANDLER(BackendExecute) {
 
     cudnnStatus_t cs = cudnnBackendExecute(handle, executionPlan, variantPack);
 
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendExecute Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendExecute Executed");
     
     return std::make_shared<Result>(cs);
 }
@@ -4230,7 +4230,7 @@ CUDNN_ROUTINE_HANDLER(BackendFinalize) {
 
     cudnnStatus_t cs = cudnnBackendFinalize(backendDesc);
 
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendFinalize Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendFinalize Executed");
     
     return std::make_shared<Result>(cs);
 }
@@ -4243,7 +4243,7 @@ CUDNN_ROUTINE_HANDLER(BackendDestroyDescriptor) {
 
     cudnnStatus_t cs = cudnnBackendDestroyDescriptor(backendDesc);
 
-    LOG4CPLUS_DEBUG(logger, "cudnnBackendDestroyDescriptor Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnBackendDestroyDescriptor Executed");
     
     return std::make_shared<Result>(cs);
 }
@@ -4313,7 +4313,7 @@ CUDNN_ROUTINE_HANDLER(BackendDestroyDescriptor) {
                 dropoutDesc,
                 auxFlags);
 
-        LOG4CPLUS_DEBUG(logger, "cudnnSetRNNDescriptor_v8 Executed");
+        // LOG4CPLUS_DEBUG(logger, "cudnnSetRNNDescriptor_v8 Executed");
         
         return std::make_shared<Result>(cs);
     }
@@ -4367,7 +4367,7 @@ CUDNN_ROUTINE_HANDLER(BackendDestroyDescriptor) {
             return std::make_shared<Result>(cs);
         }
 
-        LOG4CPLUS_DEBUG(logger, "cudnnGetRNNDescriptor_v8 Executed");
+        // LOG4CPLUS_DEBUG(logger, "cudnnGetRNNDescriptor_v8 Executed");
         
         return std::make_shared<Result>(cs, out);
     }
@@ -4416,7 +4416,7 @@ CUDNN_ROUTINE_HANDLER(CreateRNNDataDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnCreateRNNDataDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnCreateRNNDataDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4429,7 +4429,7 @@ CUDNN_ROUTINE_HANDLER(DestroyRNNDataDescriptor) {
      cudnnStatus_t cs = cudnnDestroyRNNDataDescriptor(rnnDataDesc);
      
      
-     LOG4CPLUS_DEBUG(logger, "cudnnDestroyRNNDataDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnDestroyRNNDataDescriptor Executed");
      
      return std::make_shared<Result>(cs);
 }
@@ -4450,7 +4450,7 @@ CUDNN_ROUTINE_HANDLER(SetRNNDataDescriptor) {
     
      cudnnStatus_t cs = cudnnSetRNNDataDescriptor(rnnDataDesc, dataType, layout, maxSeqLength, batchSize, vectorSize, seqLengthArray, paddingFill);
     
-    LOG4CPLUS_DEBUG(logger, "cudnnSetRNNDataDescriptor Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnSetRNNDataDescriptor Executed");
     
     return std::make_shared<Result>(cs);
 }
@@ -4472,7 +4472,7 @@ CUDNN_ROUTINE_HANDLER(GetRNNDataDescriptor) {
         : static_cast<void*>(out->Delegate<double>());
 
     cudnnStatus_t cs = cudnnGetRNNDataDescriptor(rnnDataDesc, dataType, layout, maxSeqLength, batchSize, vectorSize, arrayLengthRequested, seqLengthArray, paddingFill);
-    LOG4CPLUS_DEBUG(logger, "cudnnGetRNNDataDescriptor Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnGetRNNDataDescriptor Executed");
     return std::make_shared<Result>(cs, out);
 }
 
@@ -4493,7 +4493,7 @@ CUDNN_ROUTINE_HANDLER(GetRNNWeightSpaceSize) {
         return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnGetRNNWeightSpaceSize Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnGetRNNWeightSpaceSize Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4508,7 +4508,7 @@ CUDNN_ROUTINE_HANDLER(GetRNNTempSpaceSizes) {
     size_t reserveSpaceSize;
 
     cudnnStatus_t cs = cudnnGetRNNTempSpaceSizes(handle, rnnDesc, fMode, xDesc, &workSpaceSize, &reserveSpaceSize);
-    LOG4CPLUS_DEBUG(logger, "cudnnGetRNNTempSpaceSizes Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnGetRNNTempSpaceSizes Executed");
 
     std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
     try {
@@ -4536,7 +4536,7 @@ CUDNN_ROUTINE_HANDLER(CreateSeqDataDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnCreateSeqDataDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnCreateSeqDataDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);   
 }
@@ -4549,7 +4549,7 @@ CUDNN_ROUTINE_HANDLER(DestroySeqDataDescriptor) {
    cudnnStatus_t cs = cudnnDestroySeqDataDescriptor(seqDataDesc);
 
    
-   LOG4CPLUS_DEBUG(logger, "cudnnDestroySeqDataDescriptor Executed");
+//    LOG4CPLUS_DEBUG(logger, "cudnnDestroySeqDataDescriptor Executed");
    
    return std::make_shared<Result>(cs);
 }
@@ -4576,7 +4576,7 @@ CUDNN_ROUTINE_HANDLER(SetSeqDataDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnSetSeqDataDescriptor Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnSetSeqDataDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4607,11 +4607,11 @@ CUDNN_ROUTINE_HANDLER(GetSeqDataDescriptor) {
           out->Add<int>(seqLengthArray);
           out->Add<void>(paddingFill);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnGetSeqDataDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnGetSeqDataDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4631,7 +4631,7 @@ CUDNN_ROUTINE_HANDLER(CreateAttnDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnCreateAttnDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnCreateAttnDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);   
 }
@@ -4645,7 +4645,7 @@ CUDNN_ROUTINE_HANDLER(DestroyAttnDescriptor) {
      cudnnStatus_t cs = cudnnDestroyAttnDescriptor(attnDesc); 
 
      
-      LOG4CPLUS_DEBUG(logger, "cudnnDestroyAttnDescriptor Executed");
+    //   LOG4CPLUS_DEBUG(logger, "cudnnDestroyAttnDescriptor Executed");
      
      return std::make_shared<Result>(cs); 
 }
@@ -4684,7 +4684,7 @@ CUDNN_ROUTINE_HANDLER(SetAttnDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnSetAttnDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnSetAttnDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4741,7 +4741,7 @@ CUDNN_ROUTINE_HANDLER(GetAttnDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnGetAttnDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnGetAttnDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4767,7 +4767,7 @@ CUDNN_ROUTINE_HANDLER(GetMultiHeadAttnBuffers) {
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnGetMultiHeadAttnBuffers Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnGetMultiHeadAttnBuffers Executed");
     
     return std::make_shared<Result>(cs, out); 
 }
@@ -4794,7 +4794,7 @@ CUDNN_ROUTINE_HANDLER(GetMultiHeadAttnWeights) {
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnGetMultiHeadAttnWeights Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnGetMultiHeadAttnWeights Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4833,11 +4833,11 @@ CUDNN_ROUTINE_HANDLER(MultiHeadAttnForward) {
           out->Add<void>(workSpace);
           out->Add<void>(reserveSpace);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnMultiHeadAttnForward Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnMultiHeadAttnForward Executed");
     
     return std::make_shared<Result>(cs, out);     
 }
@@ -4883,7 +4883,7 @@ CUDNN_ROUTINE_HANDLER(MultiHeadAttnBackwardData) {
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnMultiHeadAttnBackwardData Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnMultiHeadAttnBackwardData Executed");
     
     return std::make_shared<Result>(cs, out);        
 }
@@ -4918,11 +4918,11 @@ CUDNN_ROUTINE_HANDLER(MultiHeadAttnBackwardWeights) {
           out->Add<void>(workSpace);
           out->Add<void>(reserveSpace);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
       
-    LOG4CPLUS_DEBUG(logger, "cudnnMultiHeadAttnBackwardWeights Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnMultiHeadAttnBackwardWeights Executed");
     
     return std::make_shared<Result>(cs, out);  
 }
@@ -4942,7 +4942,7 @@ CUDNN_ROUTINE_HANDLER(CreateCTCLossDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnCreateCTCLossDescriptor Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnCreateCTCLossDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4959,11 +4959,11 @@ CUDNN_ROUTINE_HANDLER(SetCTCLossDescriptor) {
       try {
           out->Add<cudnnCTCLossDescriptor_t>(ctcLossDesc);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, " cudnnSetCTCLossDescriptor Executed");
+    // LOG4CPLUS_DEBUG(logger, " cudnnSetCTCLossDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -4986,7 +4986,7 @@ CUDNN_ROUTINE_HANDLER(SetCTCLossDescriptorEx) {
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnSetCTCLossDescriptorEx Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnSetCTCLossDescriptorEx Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -5007,7 +5007,7 @@ CUDNN_ROUTINE_HANDLER(GetCTCLossDescriptor) {
          return std::make_shared<Result>(cs);
     }
     
-     LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossDescriptor Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossDescriptor Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -5028,12 +5028,12 @@ CUDNN_ROUTINE_HANDLER(GetCTCLossDescriptorEx) {
           out->Add<cudnnLossNormalizationMode_t>(normMode);
           out->Add<cudnnNanPropagation_t>(gradMode);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
     
 
-     LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossDescriptorEx Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossDescriptorEx Executed");
      
     return std::make_shared<Result>(cs, out);
 }
@@ -5046,7 +5046,7 @@ CUDNN_ROUTINE_HANDLER(DestroyCTCLossDescriptor) {
      cudnnStatus_t cs = cudnnDestroyCTCLossDescriptor(ctcLossDesc);
 
      
-     LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossDescriptorEx Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossDescriptorEx Executed");
      
      return std::make_shared<Result>(cs);
 }
@@ -5075,11 +5075,11 @@ CUDNN_ROUTINE_HANDLER(CTCLoss) {
           out->Add<void>(costs);
           out->Add<void>(gradients);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
      
-    LOG4CPLUS_DEBUG(logger, "cudnnCTCLoss Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnCTCLoss Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -5103,11 +5103,11 @@ CUDNN_ROUTINE_HANDLER(GetCTCLossWorkspaceSize) {
       try {
           out->Add<size_t>(sizeInBytes);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
      
-     LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossWorkspaceSize Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnGetCTCLossWorkspaceSize Executed");
     
     return std::make_shared<Result>(cs, out);    
 }
@@ -5122,7 +5122,7 @@ CUDNN_ROUTINE_HANDLER(SetCallback) {
      cudnnStatus_t cs = cudnnSetCallback(mask, udata, fptr);
 
     
-    LOG4CPLUS_DEBUG(logger, "cudnnSetCallback Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnSetCallback Executed");
     
     return std::make_shared<Result>(cs);
 }
@@ -5142,11 +5142,11 @@ CUDNN_ROUTINE_HANDLER(GetCallback) {
           out->Add<void>(udata);
           out->Add<cudnnCallback_t>(fptr);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnGetCallback Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnGetCallback Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -5160,7 +5160,7 @@ CUDNN_ROUTINE_HANDLER(CreateFusedOpsConstParamPack) {
      cudnnStatus_t cs = cudnnCreateFusedOpsConstParamPack(&constPack, ops);
 
      
-     LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsConstParamPack Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsConstParamPack Executed");
      
      return std::make_shared<Result>(cs);
 }
@@ -5172,7 +5172,7 @@ CUDNN_ROUTINE_HANDLER(DestroyFusedOpsConstParamPack) {
     
      cudnnStatus_t cs = cudnnDestroyFusedOpsConstParamPack(constPack);
 
-     LOG4CPLUS_DEBUG(logger, "cudnnDestroyFusedOpsConstParamPack Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnDestroyFusedOpsConstParamPack Executed");
      
      return std::make_shared<Result>(cs);
 }
@@ -5187,7 +5187,7 @@ CUDNN_ROUTINE_HANDLER(SetFusedOpsConstParamPackAttribute) {
     cudnnStatus_t cs = cudnnSetFusedOpsConstParamPackAttribute(constPack, paramLabel, param);
 
     
-     LOG4CPLUS_DEBUG(logger, "cudnnSetFusedOpsConstParamPackAttribute Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnSetFusedOpsConstParamPackAttribute Executed");
     
     return std::make_shared<Result>(cs);
 }
@@ -5210,7 +5210,7 @@ CUDNN_ROUTINE_HANDLER(GetFusedOpsConstParamPackAttribute) {
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnGetFusedOpsConstParamPackAttribute Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnGetFusedOpsConstParamPackAttribute Executed");
     
     return std::make_shared<Result>(cs, out);
 }
@@ -5224,7 +5224,7 @@ CUDNN_ROUTINE_HANDLER(CreateFusedOpsVariantParamPack) {
       cudnnStatus_t cs = cudnnCreateFusedOpsVariantParamPack(&varPack, ops);
 
       
-       LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsVariantParamPack Executed");
+    //    LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsVariantParamPack Executed");
       
       return std::make_shared<Result>(cs);
 }
@@ -5237,7 +5237,7 @@ CUDNN_ROUTINE_HANDLER(DestroyFusedOpsVariantParamPack) {
      cudnnStatus_t cs = cudnnDestroyFusedOpsVariantParamPack(varPack);
 
      
-     LOG4CPLUS_DEBUG(logger, "cudnnDestroyFusedOpsVariantParamPack Executed");
+    //  LOG4CPLUS_DEBUG(logger, "cudnnDestroyFusedOpsVariantParamPack Executed");
      
      return std::make_shared<Result>(cs);
 }
@@ -5251,7 +5251,7 @@ CUDNN_ROUTINE_HANDLER(SetFusedOpsVariantParamPackAttribute) {
 
     cudnnStatus_t cs = cudnnSetFusedOpsVariantParamPackAttribute(varPack, paramLabel, ptr);
 
-     LOG4CPLUS_DEBUG(logger, "cudnnSetFusedOpsVariantParamPackAttribute Executed");   
+    //  LOG4CPLUS_DEBUG(logger, "cudnnSetFusedOpsVariantParamPackAttribute Executed");   
     
     return std::make_shared<Result>(cs);
 }
@@ -5269,11 +5269,11 @@ CUDNN_ROUTINE_HANDLER(GetFusedOpsVariantParamPackAttribute) {
       try {
           out->Add<void>(ptr);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
          return std::make_shared<Result>(cs);
     }
     
-    LOG4CPLUS_DEBUG(logger, "cudnnGetFusedOpsVariantParamPackAttribute Executed");   
+    // LOG4CPLUS_DEBUG(logger, "cudnnGetFusedOpsVariantParamPackAttribute Executed");   
     
     return std::make_shared<Result>(cs, out);
 }
@@ -5286,7 +5286,7 @@ CUDNN_ROUTINE_HANDLER(CreateFusedOpsPlan) {
 
      cudnnStatus_t cs = cudnnCreateFusedOpsPlan(&plan, ops);
 
-     LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsPlan Executed");    
+    //  LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsPlan Executed");    
      
      return std::make_shared<Result>(cs);
 }
@@ -5299,7 +5299,7 @@ CUDNN_ROUTINE_HANDLER(DestroyFusedOpsPlan) {
     cudnnStatus_t cs = cudnnDestroyFusedOpsPlan(plan);
 
     
-    LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsPlan Executed"); 
+    // LOG4CPLUS_DEBUG(logger, "cudnnCreateFusedOpsPlan Executed"); 
     
     return std::make_shared<Result>(cs);   
 }
@@ -5318,11 +5318,11 @@ CUDNN_ROUTINE_HANDLER(MakeFusedOpsPlan) {
     try {
         out->Add<size_t>(workspaceSizeInBytes);
     } catch (const std::exception& e) {
-        LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
+        // LOG4CPLUS_DEBUG(logger, LOG4CPLUS_TEXT("Exception: ") << e.what());
         return std::make_shared<Result>(cs);
     }
 
-    LOG4CPLUS_DEBUG(logger, "cudnnMakeFusedOpsPlan Executed");
+    // LOG4CPLUS_DEBUG(logger, "cudnnMakeFusedOpsPlan Executed");
 
 return std::make_shared<Result>(cs, out);   
 }
@@ -5336,7 +5336,7 @@ CUDNN_ROUTINE_HANDLER(FusedOpsExecute) {
 
     cudnnStatus_t cs = cudnnFusedOpsExecute(handle, plan, varPack);
 
-    LOG4CPLUS_DEBUG(logger, "cudnnFusedOpsExecute Executed"); 
+    // LOG4CPLUS_DEBUG(logger, "cudnnFusedOpsExecute Executed"); 
     
     return std::make_shared<Result>(cs);   
 }

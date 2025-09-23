@@ -99,7 +99,7 @@ def inference(net, img_list, opts, use_gpu=True):
         label_output_path = data['label_output_path'][0]
 
         # 🔹 Print image path being processed
-        print(f"🖼️  Processing image: {output_path}")
+        print(f" Processing image: {output_path}")
 
         for epoch in range(1):
             net.eval()
@@ -143,8 +143,8 @@ def inference(net, img_list, opts, use_gpu=True):
             parsing_im.save(parsing_save_path)
             label_parsing.save(label_save_path)
 
-            print(f"✅ Saved parsing result at: {parsing_save_path}")
-            print(f"✅ Saved label result at:   {label_save_path}")
+            print(f" Saved parsing result at: {parsing_save_path}")
+            print(f" Saved label result at:   {label_save_path}")
 
         single_ee = time.time()
         print(f"⏱️ Time for {os.path.basename(output_path)}: {single_ee - single_ss:.2f} sec")
@@ -185,5 +185,14 @@ if __name__ == '__main__':
     file = open(osp.join(opts.data_root, opts.img_list))
     imgs = file.readlines()
 
-    inference(net=net, img_list=imgs, opts=opts)
-    print('🎉 Inference complete!')
+    try:
+        inference(net=net, img_list=imgs, opts=opts)
+        print(' Inference complete!')
+    finally:
+        # 🔹 Always cleanup, even if crash occurs
+        import gc
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        gc.collect()
+        del net
+        print(" GPU memory and CUDA context released.")
