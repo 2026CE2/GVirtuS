@@ -31,5 +31,15 @@ CUDNN_LOGERR_DBG=1 \
 CUDNN_LOGDEST_DBG=stdout \
 python3 inference_acc_00.py \
   --loadmodel ../pretrained/deeplabv3plus-xception-vocNov14_20-51-38_epoch-89.pth \
-  --img_list ../demo_imgs/img_list.txt \
+  --img_path ../demo_imgs/suit.jpg \
   --output_dir ../parsing_result
+
+
+
+# Run on multiple images
+# python3 inference_acc_00.py \
+#   --loadmodel ../pretrained/deeplabv3plus-xception-vocNov14_20-51-38_epoch-89.pth \
+#   --img_list ../demo_imgs/img_list.txt \
+#   --data_root ../demo_imgs \
+#   --output_dir ../parsing_result
+

@@ -1,21 +1,15 @@
 import socket
-import timeit
 import numpy as np
 from PIL import Image
-from datetime import datetime
 import os
 import sys
-from collections import OrderedDict
 sys.path.append('..')
 
 # PyTorch includes
 import torch
 from torch.autograd import Variable
-from torchvision import transforms
-import cv2
 
 # Custom includes
-from dataloaders import custom_transforms as tr
 from networks import deeplab_xception_transfer, graph
 from inference_dataset import get_infernce_dataloader
 
@@ -23,6 +17,7 @@ import argparse
 import torch.nn.functional as F
 import time
 import os.path as osp
+import gc
 
 # 🔹 Direct all results to demo_imgs folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -64,17 +59,8 @@ def decode_labels(mask, num_images=1, num_classes=20):
         outputs[i] = np.array(img)
     return outputs
 
-def read_img(img_path):
-    _img = Image.open(img_path).convert('RGB')
-    return _img
-
-def img_transform(img, transform=None):
-    sample = {'image': img, 'label': 0}
-    sample = transform(sample)
-    return sample
-
-def inference(net, img_list, opts, use_gpu=True):
-    total_start = time.time()  # 🔹 Track total runtime
+def inference(net, opts, use_gpu=True):
+    total_start = time.time()
 
     # Prepare graph adjacencies
     adj2_ = torch.from_numpy(graph.cihp2pascal_nlp_adj).float()
@@ -87,6 +73,7 @@ def inference(net, img_list, opts, use_gpu=True):
     adj3_ = Variable(torch.from_numpy(cihp_adj).float())
     adj1_test = adj3_.unsqueeze(0).unsqueeze(0).expand(1, 1, 20, 20).cuda()
 
+    # 🔹 Get dataloader (batch or single)
     inference_dataloader = get_infernce_dataloader(opts)
     total = len(inference_dataloader)
 
@@ -98,69 +85,65 @@ def inference(net, img_list, opts, use_gpu=True):
         output_path = data['output_path'][0]
         label_output_path = data['label_output_path'][0]
 
-        # 🔹 Print image path being processed
-        print(f" Processing image: {output_path}")
+        print(f"🖼️  Processing image: {output_path}")
 
-        for epoch in range(1):
-            net.eval()
+        net.eval()
+        for iii, sample_batched in enumerate(zip(testloader_list, testloader_flip_list)):
+            inputs, labels = sample_batched[0]['image'], sample_batched[0]['label']
+            inputs_f, _ = sample_batched[1]['image'], sample_batched[1]['label']
+            inputs = torch.cat((inputs, inputs_f), dim=0)
 
-            for iii, sample_batched in enumerate(zip(testloader_list, testloader_flip_list)):
-                inputs, labels = sample_batched[0]['image'], sample_batched[0]['label']
-                inputs_f, _ = sample_batched[1]['image'], sample_batched[1]['label']
-                inputs = torch.cat((inputs, inputs_f), dim=0)
+            if iii == 0:
+                _, _, h, w = inputs.size()
 
-                if iii == 0:
-                    _, _, h, w = inputs.size()
+            inputs = Variable(inputs, requires_grad=False)
 
-                inputs = Variable(inputs, requires_grad=False)
+            with torch.no_grad():
+                if use_gpu:
+                    inputs = inputs.cuda()
+                outputs = net.forward(inputs, adj1_test.cuda(), adj3_test.cuda(), adj2_test.cuda())
+                outputs = (outputs[0] + flip(flip_cihp(outputs[1]), dim=-1)) / 2
+                outputs = outputs.unsqueeze(0)
 
-                with torch.no_grad():
-                    if use_gpu:
-                        inputs = inputs.cuda()
-                    outputs = net.forward(inputs, adj1_test.cuda(), adj3_test.cuda(), adj2_test.cuda())
-                    outputs = (outputs[0] + flip(flip_cihp(outputs[1]), dim=-1)) / 2
-                    outputs = outputs.unsqueeze(0)
+                if iii > 0:
+                    outputs = F.upsample(outputs, size=(h, w), mode='bilinear', align_corners=True)
+                    outputs_final = outputs_final + outputs
+                else:
+                    outputs_final = outputs.clone()
 
-                    if iii > 0:
-                        outputs = F.upsample(outputs, size=(h, w), mode='bilinear', align_corners=True)
-                        outputs_final = outputs_final + outputs
-                    else:
-                        outputs_final = outputs.clone()
+        predictions = torch.max(outputs_final, 1)[1]
+        results = predictions.cpu().numpy()
+        vis_res = decode_labels(results)
 
-            predictions = torch.max(outputs_final, 1)[1]
-            results = predictions.cpu().numpy()
-            vis_res = decode_labels(results)
+        results = results.astype(np.uint8)
+        parsing_im = Image.fromarray(vis_res[0])
+        label_parsing = Image.fromarray(results[0, :, :], 'L')
 
-            results = results.astype(np.uint8)
-            parsing_im = Image.fromarray(vis_res[0])
-            label_parsing = Image.fromarray(results[0, :, :], 'L')
+        img_name = os.path.basename(output_path).replace("_vis.png", "")
+        parsing_save_path = os.path.join(demo_imgs_dir, f"parsed_{img_name}.png")
+        label_save_path   = os.path.join(demo_imgs_dir, f"label_{img_name}.png")
 
-            # 🔹 Save directly into demo_imgs
-            img_name = os.path.basename(output_path).replace("_vis.png", "")
-            parsing_save_path = os.path.join(demo_imgs_dir, f"parsed_{img_name}.png")
-            label_save_path   = os.path.join(demo_imgs_dir, f"label_{img_name}.png")
+        parsing_im.save(parsing_save_path)
+        label_parsing.save(label_save_path)
 
-            parsing_im.save(parsing_save_path)
-            label_parsing.save(label_save_path)
+        print(f" Saved parsing result at: {parsing_save_path}")
+        print(f" Saved label result at:   {label_save_path}")
+        print(f"⏱ Time for {os.path.basename(output_path)}: {time.time() - single_ss:.2f} sec")
 
-            print(f" Saved parsing result at: {parsing_save_path}")
-            print(f" Saved label result at:   {label_save_path}")
+    print(f"🔥 Total time: {time.time() - total_start:.2f} seconds")
 
-        single_ee = time.time()
-        print(f"⏱️ Time for {os.path.basename(output_path)}: {single_ee - single_ss:.2f} sec")
-
-    total_end = time.time()
-    print(f"🔥 Total time for all images: {total_end - total_start:.2f} seconds")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--loadmodel', default='', type=str)
-    parser.add_argument('--img_list', default='', type=str)
     parser.add_argument('--output_dir', default='', type=str)
     parser.add_argument('--use_gpu', default=1, type=int)
-    parser.add_argument('--data_root', default='', type=str)
-    parser.add_argument('--phase', default='train', type=str)
+    parser.add_argument('--img_path', default='', type=str, help="Single image path")
+    parser.add_argument('--img_list', default='', type=str, help="List of images (batch mode)")
+    parser.add_argument('--data_root', default='', type=str, help="Root dir for images when using img_list")
+    parser.add_argument('--phase', default='train', type=str, help="Dataset phase (train/test)")  # 🔹 added back
     opts = parser.parse_args()
+
 
     net = deeplab_xception_transfer.deeplab_xception_transfer_projection_v3v5_more_savemem(
         n_classes=20, os=16, hidden_layers=128, source_classes=7)
@@ -182,15 +165,18 @@ if __name__ == '__main__':
     if not os.path.exists(opts.output_dir):
         os.makedirs(opts.output_dir)
 
-    file = open(osp.join(opts.data_root, opts.img_list))
-    imgs = file.readlines()
+    # 🔹 Handle single image by faking an img_list
+    if opts.img_path != "":
+        tmp_list = os.path.join(opts.output_dir, "tmp_single_img.txt")
+        with open(tmp_list, "w") as f:
+            f.write(opts.img_path + "\n")
+        opts.img_list = tmp_list
+        opts.data_root = os.path.dirname(opts.img_path)
 
     try:
-        inference(net=net, img_list=imgs, opts=opts)
+        inference(net=net, opts=opts, use_gpu=use_gpu)
         print(' Inference complete!')
     finally:
-        # 🔹 Always cleanup, even if crash occurs
-        import gc
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
         gc.collect()
