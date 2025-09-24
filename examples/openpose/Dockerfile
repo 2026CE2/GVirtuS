@@ -46,10 +46,10 @@ RUN ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages
+# # Install Python packages
 RUN pip3 install opencv-python
 
-# Clone and build GVirtuS
+# # Clone and build GVirtuS
 WORKDIR /opt
 RUN git clone https://github.com/ecn-aau/GVirtuS.git && \
     cd GVirtuS && mkdir build && cd build && \
@@ -58,7 +58,7 @@ RUN git clone https://github.com/ecn-aau/GVirtuS.git && \
 
 # Clone and build OpenPose
 WORKDIR /opt
-RUN git clone --depth=1 https://github.com/CMU-Perceptual-Computing-Lab/openpose.git
+RUN git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose.git
 
 # Copy custom Cuda.cmake
 COPY cmake/Cuda.cmake ${OPENPOSE_HOME}/cmake/Cuda.cmake
