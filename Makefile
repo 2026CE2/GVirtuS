@@ -66,7 +66,7 @@ docker-build-openpose:
 
 run-openpose-test: 
 	docker run --rm \
-		--name openpose_test_container \
+		--name openpose_container \
 		--network host \
 		-v ./examples/openpose/media:/opt/openpose/examples/media \
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \

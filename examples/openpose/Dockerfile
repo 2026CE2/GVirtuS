@@ -3,7 +3,7 @@ FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GVIRTUS_HOME=/opt/GVirtuS
 ENV OPENPOSE_HOME=/opt/openpose
-# ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
 
 
 # Prevent tzdata prompt and install dependencies
