@@ -60,18 +60,22 @@ def decode_labels(mask, num_images=1, num_classes=20):
     return outputs
 
 def inference(net, opts, use_gpu=True):
+    if use_gpu==True:
+        device="cuda"
+    else:
+        device = "cpu"
     total_start = time.time()
 
     # Prepare graph adjacencies
     adj2_ = torch.from_numpy(graph.cihp2pascal_nlp_adj).float()
-    adj2_test = adj2_.unsqueeze(0).unsqueeze(0).expand(1, 1, 7, 20).cuda().transpose(2, 3)
+    adj2_test = adj2_.unsqueeze(0).unsqueeze(0).expand(1, 1, 7, 20).to(device).transpose(2, 3)
 
     adj1_ = Variable(torch.from_numpy(graph.preprocess_adj(graph.pascal_graph)).float())
-    adj3_test = adj1_.unsqueeze(0).unsqueeze(0).expand(1, 1, 7, 7).cuda()
+    adj3_test = adj1_.unsqueeze(0).unsqueeze(0).expand(1, 1, 7, 7).to(device)
 
     cihp_adj = graph.preprocess_adj(graph.cihp_graph)
     adj3_ = Variable(torch.from_numpy(cihp_adj).float())
-    adj1_test = adj3_.unsqueeze(0).unsqueeze(0).expand(1, 1, 20, 20).cuda()
+    adj1_test = adj3_.unsqueeze(0).unsqueeze(0).expand(1, 1, 20, 20).to(device)
 
     # 🔹 Get dataloader (batch or single)
     inference_dataloader = get_infernce_dataloader(opts)
@@ -101,7 +105,7 @@ def inference(net, opts, use_gpu=True):
             with torch.no_grad():
                 if use_gpu:
                     inputs = inputs.cuda()
-                outputs = net.forward(inputs, adj1_test.cuda(), adj3_test.cuda(), adj2_test.cuda())
+                outputs = net.forward(inputs, adj1_test.to(device), adj3_test.to(device), adj2_test.to(device))
                 outputs = (outputs[0] + flip(flip_cihp(outputs[1]), dim=-1)) / 2
                 outputs = outputs.unsqueeze(0)
 
@@ -160,7 +164,7 @@ if __name__ == '__main__':
         use_gpu = True
     else:
         use_gpu = False
-        raise RuntimeError('❌ Must use GPU!')
+#        raise RuntimeError('❌ Must use GPU!')
 
     if not os.path.exists(opts.output_dir):
         os.makedirs(opts.output_dir)
