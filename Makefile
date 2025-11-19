@@ -18,7 +18,7 @@ docker-build-push-prod:
 		-t taslanidis/gvirtus:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
-run-gvirtus-backend:
+run-gvirtus-backend-dev:
 	docker run \
 		--rm \
 		-it \
@@ -39,26 +39,6 @@ run-gvirtus-backend:
 		--name gvirtus \
 		--shm-size=8G \
 		taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04
-
-run-gvirtus-frontend:
-	docker run \
-		--rm \
-		-it \
-		--privileged \
-		-v ./cmake:/gvirtus/cmake/ \
-		-v ./etc:/gvirtus/etc/ \
-		-v ./include:/gvirtus/include/ \
-		-v ./plugins:/gvirtus/plugins/ \
-		-v ./src:/gvirtus/src/ \
-		-v ./tools:/gvirtus/tools/ \
-		-v ./tests:/gvirtus/tests/ \
-		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
-		-v ./docker/prod/entrypoint.sh:/entrypoint.sh \
-		-v ./examples:/gvirtus/examples/ \
-		--entrypoint /build.sh \
-		--name gvirtus-no-gpu \
-		--shm-size=8G \
-		gvirtus-dev:cuda12.6.3-cudnn-ubuntu22.04
 
 attach-gvirtus-bash:
 		docker exec -it gvirtus bash
