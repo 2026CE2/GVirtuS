@@ -24,7 +24,6 @@ run-gvirtus-backend-dev:
 		-it \
 		--network host \
 		--privileged \
-		--gpus all \
 		-v ./cmake:/gvirtus/cmake/ \
 		-v ./etc:/gvirtus/etc/ \
 		-v ./include:/gvirtus/include/ \
@@ -37,8 +36,9 @@ run-gvirtus-backend-dev:
 		-v ./examples:/gvirtus/examples/ \
 		--entrypoint /entrypoint.sh \
 		--name gvirtus \
+		--runtime=nvidia \
 		--shm-size=8G \
-		taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04
+		tinghui8576/gvirtus-dev:cuda12.6.3-cudnn-ubuntu22.04
 
 attach-gvirtus-bash:
 		docker exec -it gvirtus bash

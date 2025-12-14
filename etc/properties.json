@@ -5,7 +5,7 @@
                 "suite": "tcp/ip",
                 "protocol": "tcp",
                 "server_address": "24.24.24.1",
-                "port": "2024"
+                "port": "2222"
             },
             "plugins": [
                 "cuda",
