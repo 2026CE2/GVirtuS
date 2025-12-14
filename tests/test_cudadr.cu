@@ -1,5 +1,10 @@
-#include <gtest/gtest.h>
+/*
+ * Written By: Theodoros Aslanidis <theodoros.aslanidis@ucdconnect.ie>
+ *             School of Computer Science, University College Dublin
+ */
+
 #include <cuda.h>
+#include <gtest/gtest.h>
 
 #define CUDA_CHECK(err) ASSERT_EQ((err), CUDA_SUCCESS)
 
@@ -7,4 +12,15 @@ TEST(cudaDR, getDriverVersion) {
     int version = 0;
     CUDA_CHECK(cuDriverGetVersion(&version));
     ASSERT_GT(version, 0);
+}
+
+TEST(cudaDR, getProcAddress) {
+    const char* symbol = "cuDriverGetVersion";
+    void* pfn = nullptr;
+    int version = 0;
+    CUDA_CHECK(cuDriverGetVersion(&version));
+    cuuint64_t flags = 0;
+    CUdriverProcAddressQueryResult status;
+    
+    CUDA_CHECK(cuGetProcAddress(symbol, &pfn, version, flags, &status));
 }
