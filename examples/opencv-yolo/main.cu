@@ -1,3 +1,11 @@
+/*******************************************************
+ * Description:
+ *   This code is adapted from yolov5-v6.1-opencv-onnxrun
+ *
+ * Original Author: hpc203
+ * Original Source: https://github.com/hpc203/yolov5-v6.1-opencv-onnxrun
+ *******************************************************/
+
 #include <fstream>
 #include <sstream>
 #include <iostream>
