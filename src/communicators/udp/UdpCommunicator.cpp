@@ -95,7 +95,7 @@ void UdpCommunicator::Serve() {
 
     struct sockaddr_in socket_addr;
 
-    if ((mSocketFd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    if ((mSocketFd = socket(AF_INET, SOCK_DGRAM, 0)) == 0)
         throw runtime_error("UdpCommunicator: Can't create socket: " + string(strerror(errno)) +
                             ".");
 
@@ -105,17 +105,18 @@ void UdpCommunicator::Serve() {
     socket_addr.sin_port = htons(mPort);
     socket_addr.sin_addr.s_addr = INADDR_ANY;
 
-    char on = 1;
-    setsockopt(mSocketFd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    // char on = 1;
+    // setsockopt(mSocketFd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
     int bindResult = bind(mSocketFd, (struct sockaddr *)&socket_addr, sizeof(struct sockaddr_in));
     if (bindResult != 0)
         throw runtime_error("UdpCommunicator: Can't bind socket: " + string(strerror(errno)) + ".");
-
-    int listenResult = listen(mSocketFd, 5);
-    if (listenResult != 0)
-        throw runtime_error(
-            "UdpCommunicator: Can't listen from socket: " + string(strerror(errno)) + ".");
+    // socklen_t len;
+    // len = sizeof(client_addr);
+    // int listenResult = recvfrom(mSocketFd, nullptr, 0, MSG_WAITALL, ( struct sockaddr *) &client_addr, &len);
+    // if (listenResult != 0)
+    //     throw runtime_error(    
+    //         "UdpCommunicator: Can't listen from socket: " + string(strerror(errno)) + ".");
 
 #ifdef DEBUG
     cout << "UdpCommunicator::Serve() returned" << endl;
@@ -134,18 +135,38 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
 #else
     int client_socket_addr_size;
 #endif
+        // Creating socket file descriptor 
+    if ( (client_socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
+        perror("socket creation failed"); 
+        exit(EXIT_FAILURE); 
+    } 
+    memset((char *)&client_socket_addr, 0, sizeof(struct sockaddr_in));
 
-    client_socket_addr_size = sizeof(struct sockaddr_in);
-    if ((client_socket_fd =
-             accept(mSocketFd, (sockaddr *)&client_socket_addr, &client_socket_addr_size)) == 0 ||
-        errno == EINTR) {
-        return nullptr;
+    client_socket_addr.sin_family = AF_INET;
+    client_socket_addr.sin_port = htons(mPort);
+    client_socket_addr.sin_addr.s_addr = INADDR_ANY;
+
+    char on = 1;
+    // if (setsockopt(client_sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
+    //     throw std::runtime_error("setsockopt SO_REUSEPORT failed");
+    if (setsockopt(client_socket_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
+        throw std::runtime_error("setsockopt SO_REUSEADDR failed");
+
+    if ( bind(client_socket_fd, (const struct sockaddr *)&client_socket_addr,  
+            sizeof(client_socket_addr)) < 0 ) 
+    { 
+        perror("bind failed"); 
+        exit(EXIT_FAILURE); 
     }
+
+    socklen_t len;
+    len = sizeof(client_socket_addr);
+    connect(client_socket_fd, (sockaddr*)&client_socket_addr, len);
 
 #ifdef DEBUG
     cout << "UdpCommunicator::Accept() client_socket_fd: " << client_socket_fd << endl;
 #endif
-    return new UdpCommunicator(client_socket_fd, inet_ntoa(client_socket_addr.sin_addr));
+    return this; // new UdpCommunicator(client_socket_fd, inet_ntoa(client_socket_addr.sin_addr));
 }
 
 void UdpCommunicator::Connect() {
@@ -155,7 +176,7 @@ void UdpCommunicator::Connect() {
 
     struct sockaddr_in remote;
 
-    if ((mSocketFd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    if ((mSocketFd = socket(AF_INET, SOCK_DGRAM, 0)) == 0)
         throw runtime_error("UdpCommunicator: Can't create socket: " + string(strerror(errno)) +
                             ".");
 

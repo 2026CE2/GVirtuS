@@ -20,7 +20,7 @@
 
 namespace gvirtus::communicators {
 /**
- * UdpCommunicator implements a Communicator for the TCP/IP socket.
+ * UdpCommunicator implements a Communicator for the UDP/IP socket.
  */
 class UdpCommunicator : public Communicator {
    public:
