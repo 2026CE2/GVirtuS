@@ -56,6 +56,11 @@ class EndpointFactory {
             auto end = common::JSON<Endpoint_Tcp>(json_path).parser();
             ptr = std::make_shared<Endpoint_Tcp>(end);
         }
+        else if (suite == "udp/ip") {
+            LOG4CPLUS_INFO(logger, "Initializing UDP/IP Endpoint");
+            auto end = common::JSON<Endpoint_Tcp>(json_path).parser();
+            ptr = std::make_shared<Endpoint_Tcp>(end);
+        }
         // infiniband
         else if ("infiniband-rdma" == j["communicator"][ind_endpoint]["endpoint"].at("suite")) {
 #ifdef DEBUG

@@ -88,6 +88,12 @@ add_library(gvirtus-communicators-tcp SHARED
 target_link_libraries(gvirtus-communicators-tcp gvirtus-communicators)
 gvirtus_install_target(gvirtus-communicators-tcp)
 
+## UDP COMMUNICATOR
+add_library(gvirtus-communicators-udp SHARED
+    src/communicators/udp/UdpCommunicator.cpp)
+target_link_libraries(gvirtus-communicators-udp gvirtus-communicators)
+gvirtus_install_target(gvirtus-communicators-udp)
+
 ## IB COMMUNICATOR
 add_library(gvirtus-communicators-ib SHARED
     src/communicators/rdma/ktmrdma.cpp
@@ -107,6 +113,7 @@ target_include_directories(gvirtus-communicators-hybrid
 target_link_libraries(gvirtus-communicators-hybrid
     gvirtus-communicators
     gvirtus-communicators-tcp
+    gvirtus-communicators-udp
     gvirtus-communicators-ib
 )
 gvirtus_install_target(gvirtus-communicators-hybrid)

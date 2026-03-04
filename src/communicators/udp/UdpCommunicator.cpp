@@ -52,8 +52,7 @@ UdpCommunicator::UdpCommunicator(const std::string &communicator) {
     // mPort = (short)strtol(portptr + 1, NULL, 10);
     
     const size_t valueptr = communicator.find("://") + 3;
-    const size_t portptr = communicator.find(":");
-    if (portptr == NULL) throw runtime_error("Port not specified.");
+    const size_t portptr = communicator.find(":", valueptr);
     mPort = static_cast<unsigned short>(std::stoi(communicator.substr(portptr +1)));
 
 
@@ -171,7 +170,7 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
 
 void UdpCommunicator::Connect() {
 #ifdef DEBUG
-    cout << "UdpCommunicator::Connect() called " < < < < endl;
+    cout << "UdpCommunicator::Connect() called " << endl;
 #endif
 
     struct sockaddr_in remote;
