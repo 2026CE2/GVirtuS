@@ -9,6 +9,14 @@ docker-build-push-dev:
 		-t taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
+docker-build-dev-local:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f docker/dev/Dockerfile \
+		-t gvirtus_backend \
+		.
+
 docker-build-push-prod:
 	docker buildx build \
 		--platform linux/amd64 \
@@ -40,6 +48,28 @@ run-gvirtus-backend-dev:
 		--shm-size=8G \
 		tinghui8576/gvirtus-dev:cuda12.6.3-cudnn-ubuntu22.04
 
+run-gvirtus-backend-dev-local:
+	docker run \
+		--rm \
+		-it \
+		--network host \
+		--privileged \
+		-v ./cmake:/gvirtus/cmake/ \
+		-v ./etc:/gvirtus/etc/ \
+		-v ./include:/gvirtus/include/ \
+		-v ./plugins:/gvirtus/plugins/ \
+		-v ./src:/gvirtus/src/ \
+		-v ./tools:/gvirtus/tools/ \
+		-v ./tests:/gvirtus/tests/ \
+		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
+		-v ./docker/dev/entrypoint.sh:/entrypoint.sh \
+		-v ./examples:/gvirtus/examples/ \
+		--entrypoint /entrypoint.sh \
+		--name gvirtus \
+		--runtime=nvidia \
+		--shm-size=8G \
+		gvirtus_backend
+
 attach-gvirtus-bash:
 		docker exec -it gvirtus bash
 
@@ -64,6 +94,13 @@ docker-build-openpose:
 		-t darsh916/openpose_gvirtus:cuda12.6 \
 		examples/openpose	
 
+docker-build-openpose-local:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f examples/openpose/Dockerfile \
+		-t openpose_local \
+		examples/openpose	
 
 run-openpose-test: 
 	docker run --rm \
@@ -74,6 +111,17 @@ run-openpose-test:
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
 		darsh916/openpose_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+run-openpose-test-local: 
+	docker run --rm \
+		--name openpose_container \
+		--network host \
+		-v ./examples/openpose/media:/opt/openpose/examples/media \
+		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
+		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
+		openpose_local \
 		bash /entrypoint.sh
 
 stop-openpose-test:
