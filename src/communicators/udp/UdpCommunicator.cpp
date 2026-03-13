@@ -128,7 +128,7 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
 #endif
 
     unsigned client_socket_fd;
-    struct sockaddr_in client_socket_addr;
+    struct sockaddr_in client_socket_addr, cliaddr;
 #ifndef _WIN32
     unsigned client_socket_addr_size;
 #else
@@ -140,16 +140,25 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
         exit(EXIT_FAILURE); 
     } 
     memset((char *)&client_socket_addr, 0, sizeof(struct sockaddr_in));
-
+    cout << "UdpCommunicator::Accept() wrote sock_addr: " << endl;
     client_socket_addr.sin_family = AF_INET;
     client_socket_addr.sin_port = htons(mPort);
     client_socket_addr.sin_addr.s_addr = INADDR_ANY;
+
+
+    socklen_t len = sizeof(cliaddr);  //len is value/result 
+      
+    int n = recvfrom(mSocketFd, (char *)nullptr, 0,  
+                MSG_WAITALL, (struct sockaddr *) &cliaddr, 
+                &len);
 
     char on = 1;
     // if (setsockopt(client_sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
     //     throw std::runtime_error("setsockopt SO_REUSEPORT failed");
     if (setsockopt(client_socket_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
         throw std::runtime_error("setsockopt SO_REUSEADDR failed");
+
+    cout << "UdpCommunicator::Accept() set socket opt: " << endl;
 
     if ( bind(client_socket_fd, (const struct sockaddr *)&client_socket_addr,  
             sizeof(client_socket_addr)) < 0 ) 
@@ -158,9 +167,11 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
         exit(EXIT_FAILURE); 
     }
 
-    socklen_t len;
+    cout << "UdpCommunicator::Accept() bind: " << endl;
+
+    // socklen_t len;
     len = sizeof(client_socket_addr);
-    connect(client_socket_fd, (sockaddr*)&client_socket_addr, len);
+    connect(client_socket_fd, (sockaddr*)&cliaddr, len);
 
 #ifdef DEBUG
     cout << "UdpCommunicator::Accept() client_socket_fd: " << client_socket_fd << endl;
@@ -186,6 +197,8 @@ void UdpCommunicator::Connect() {
     if (connect(mSocketFd, (struct sockaddr *)&remote, sizeof(struct sockaddr_in)) != 0)
         throw runtime_error("UdpCommunicator: Can't connect to socket: " + string(strerror(errno)) +
                             ".");
+    const char *hello = "Hello from client";
+    send(mSocketFd, hello, strlen(hello), MSG_CONFIRM);
 
     InitializeStream();
 
