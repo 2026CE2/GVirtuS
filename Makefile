@@ -97,8 +97,7 @@ docker-build-openpose:
 docker-build-openpose-local:
 	docker buildx build \
 		--platform linux/amd64 \
-		--no-cache \
-		-f examples/openpose/Dockerfile \
+		-f examples/openpose/Dockerfile-local \
 		-t openpose_local \
 		examples/openpose	
 
