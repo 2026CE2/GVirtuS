@@ -8,7 +8,7 @@ export GVIRTUS_LOGLEVEL=10000
 export LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
 
 # --- Navigate to the examples folder ---
-cd "${GVIRTUS_HOME}/examples" || { echo "Failed to enter ${GVIRTUS_HOME}/examples"; exit 1; }
+cd "${GVIRTUS_HOME}/examples/simple_matrix" || { echo "Failed to enter ${GVIRTUS_HOME}/examples"; exit 1; }
 
 # --- Compile the CUDA program ---
 nvcc simple_matrix.cu -o simple_matrix \

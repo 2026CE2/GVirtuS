@@ -97,6 +97,7 @@ docker-build-openpose:
 docker-build-openpose-local:
 	docker buildx build \
 		--platform linux/amd64 \
+		--no-cache \
 		-f examples/openpose/Dockerfile-local \
 		-t openpose_local \
 		examples/openpose	
@@ -121,6 +122,16 @@ run-openpose-test-local:
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
 		openpose_local \
+		bash /entrypoint.sh
+
+run-matrix-mul-test-local: 
+	docker run --rm \
+		--name matrix_mul_container \
+		--network host \
+		-v ./examples/simple_matrix:/opt/simple_matrix/examples/gvirtus \
+		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/simple_matrix/frontend.sh:/entrypoint.sh \
+		matrix-mul \
 		bash /entrypoint.sh
 
 stop-openpose-test:

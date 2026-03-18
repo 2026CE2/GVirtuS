@@ -10,6 +10,7 @@
 #define DEBUG
 
 #include "UdpCommunicator.h"
+#include "UdpStreamBuf.hpp"
 
 #ifndef _WIN32
 
@@ -104,8 +105,10 @@ void UdpCommunicator::Serve() {
     socket_addr.sin_port = htons(mPort);
     socket_addr.sin_addr.s_addr = INADDR_ANY;
 
-    // char on = 1;
+    int on = 1;
     // setsockopt(mSocketFd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    if (setsockopt(mSocketFd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
+        throw std::runtime_error("setsockopt SO_REUSEADDR failed");
 
     int bindResult = bind(mSocketFd, (struct sockaddr *)&socket_addr, sizeof(struct sockaddr_in));
     if (bindResult != 0)
@@ -145,14 +148,14 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
     client_socket_addr.sin_port = htons(mPort);
     client_socket_addr.sin_addr.s_addr = INADDR_ANY;
 
-
+    cout << "UdpCommunicator::Accept() wrote ???: " << endl;
     socklen_t len = sizeof(cliaddr);  //len is value/result 
       
     int n = recvfrom(mSocketFd, (char *)nullptr, 0,  
                 MSG_WAITALL, (struct sockaddr *) &cliaddr, 
                 &len);
-
-    char on = 1;
+    cout << "UdpCommunicator::Accept() wrote !!!! " << endl;
+    int on = 1;
     // if (setsockopt(client_sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
     //     throw std::runtime_error("setsockopt SO_REUSEPORT failed");
     if (setsockopt(client_socket_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
@@ -176,7 +179,7 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
 #ifdef DEBUG
     cout << "UdpCommunicator::Accept() client_socket_fd: " << client_socket_fd << endl;
 #endif
-    return this; // new UdpCommunicator(client_socket_fd, inet_ntoa(client_socket_addr.sin_addr));
+    return new UdpCommunicator(client_socket_fd, inet_ntoa(client_socket_addr.sin_addr));
 }
 
 void UdpCommunicator::Connect() {
@@ -254,16 +257,9 @@ size_t UdpCommunicator::Write(const char *buffer, size_t size) {
 void UdpCommunicator::Sync() { mpOutput->flush(); }
 
 void UdpCommunicator::InitializeStream() {
-#ifdef _WIN32
-    FILE *i = _fdopen(mSocketFd, "r");
-    FILE *o = _fdopen(mSocketFd, "w");
-    mpInputBuf = new filebuf(i);
-    mpOutputBuf = new filebuf(o);
-#else
-    mpInputBuf = new __gnu_cxx::stdio_filebuf<char>(mSocketFd, ios_base::in);
-    mpOutputBuf = new __gnu_cxx::stdio_filebuf<char>(mSocketFd, ios_base::out);
-#endif
 
+    mpInputBuf = new UdpStreamBuf(mSocketFd);
+    mpOutputBuf = new UdpStreamBuf(mSocketFd);
     mpInput = new istream(mpInputBuf);
     mpOutput = new ostream(mpOutputBuf);
 }

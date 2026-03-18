@@ -16,6 +16,7 @@
 #include <ext/stdio_filebuf.h>
 #endif
 
+#include "UdpStreamBuf.hpp"
 #include "gvirtus/communicators/Communicator.h"
 
 namespace gvirtus::communicators {
@@ -37,7 +38,7 @@ class UdpCommunicator : public Communicator {
     void Sync();
     void Close();
 
-    std::string to_string() override { return "UdpCommunicator"; }
+    std::string to_string() override { return "udpcommunicator"; }
 
    private:
     void InitializeStream();
@@ -52,8 +53,8 @@ class UdpCommunicator : public Communicator {
     std::filebuf *mpInputBuf;
     std::filebuf *mpOutputBuf;
 #else
-    __gnu_cxx::stdio_filebuf<char> *mpInputBuf;
-    __gnu_cxx::stdio_filebuf<char> *mpOutputBuf;
+    UdpStreamBuf *mpInputBuf;
+    UdpStreamBuf *mpOutputBuf;
 #endif
 };
 }  // namespace gvirtus::communicators
