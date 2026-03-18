@@ -124,13 +124,28 @@ run-openpose-test-local:
 		openpose_local \
 		bash /entrypoint.sh
 
+docker-build-matrix-mul-test-local:
+	docker buildx build \
+		--platform linux/amd64 \
+		-t matrix-mul \
+		-f ./examples/simple_matrix_local/Dockerfile-local \
+		.
+
 run-matrix-mul-test-local: 
-	docker run --rm \
-		--name matrix_mul_container \
+	docker run \
+		--rm \
+		-it \
 		--network host \
-		-v ./examples/simple_matrix:/opt/simple_matrix/examples/gvirtus \
-		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
-		-v ./examples/simple_matrix/frontend.sh:/entrypoint.sh \
+		--privileged \
+		-v ./cmake:/gvirtus/cmake/ \
+		-v ./etc:/gvirtus/etc/ \
+		-v ./include:/gvirtus/include/ \
+		-v ./plugins:/gvirtus/plugins/ \
+		-v ./src:/gvirtus/src/ \
+		-v ./tools:/gvirtus/tools/ \
+		-v ./tests:/gvirtus/tests/ \
+		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
+		-v ./examples:/gvirtus/examples/ \
 		matrix-mul \
 		bash /entrypoint.sh
 
