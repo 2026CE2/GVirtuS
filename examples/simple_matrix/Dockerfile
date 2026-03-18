@@ -4,6 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV GVIRTUS_HOME=/opt/GVirtuS
 
 RUN apt update && apt install -y --no-install-recommends \
+    git \
     build-essential \
     libxmu-dev \
     libxi-dev \
@@ -18,8 +19,10 @@ RUN apt update && apt install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
-RUN git clone https://github.com/ecn-aau/GVirtuS.git && \
-    cd GVirtuS && mkdir build && cd build && \
+RUN git clone https://github.com/2026CE2/GVirtuS.git && \
+    cd GVirtuS && \
+    git checkout CSP-9-Implement-udp-protocol && \
+    mkdir build && cd build && \
     cmake -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} .. && \
     make -j$(nproc) && make install
 

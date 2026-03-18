@@ -2,9 +2,9 @@
     "communicator": [
         {
             "endpoint": {
-                "suite": "udp/ip",
-                "protocol": "udp",
-                "server_address": "127.0.0.1",
+                "suite": "tcp/ip",
+                "protocol": "tcp",
+                "server_address": "130.225.243.38",
                 "port": "2222"
             },
             "plugins": [

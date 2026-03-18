@@ -1,4 +1,4 @@
-.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-human-parsing-test
+.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-human-parsing-test docker-build-simple-matrix run-simple-matrix-frontend
 
 docker-build-push-dev:
 	docker buildx build \
@@ -163,3 +163,24 @@ run-2d-human-parsing-test:
 
 stop-2d-human-parsing-test:
 	docker stop human-parsing_test_container || true
+
+
+docker-build-simple-matrix:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f examples/simple_matrix/Dockerfile \
+		-t simple_matrix \
+		.
+
+run-simple-matrix-frontend:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_frontend \
+		--network host \
+		-v ./etc/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/simple_matrix/simple_matrix.cu:/opt/GVirtuS/examples/simple_matrix.cu \
+		-v ./examples/simple_matrix/frontend.sh:/opt/GVirtuS/frontend.sh \
+		simple_matrix \
+		bash /opt/GVirtuS/frontend.sh
