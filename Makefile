@@ -179,13 +179,11 @@ run-2d-human-parsing-test:
 stop-2d-human-parsing-test:
 	docker stop human-parsing_test_container || true
 
-
-docker-build-simple-matrix:
+docker-build-gvirtus-frontend-base:
 	docker buildx build \
 		--platform linux/amd64 \
-		--no-cache \
-		-f examples/simple_matrix/Dockerfile \
-		-t simple_matrix \
+		-f docker/dev/Dockerfile.frontend \
+		-t frontend_base \
 		.
 
 run-simple-matrix-frontend:
@@ -194,8 +192,8 @@ run-simple-matrix-frontend:
 		-it \
 		--name simple_matrix_frontend \
 		--network host \
-		-v ./etc/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/simple_matrix/simple_matrix.cu:/opt/GVirtuS/examples/simple_matrix.cu \
 		-v ./examples/simple_matrix/frontend.sh:/opt/GVirtuS/frontend.sh \
-		simple_matrix \
+		frontend_base \
 		bash /opt/GVirtuS/frontend.sh
