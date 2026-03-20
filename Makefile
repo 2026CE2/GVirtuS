@@ -192,8 +192,7 @@ run-simple-matrix-frontend:
 		-it \
 		--name simple_matrix_frontend \
 		--network host \
-		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
-		-v ./examples/simple_matrix/simple_matrix.cu:/opt/GVirtuS/examples/simple_matrix.cu \
+		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
 		-v ./examples/simple_matrix/frontend.sh:/opt/GVirtuS/frontend.sh \
 		frontend_base \
 		bash /opt/GVirtuS/frontend.sh
