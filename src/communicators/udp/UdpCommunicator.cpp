@@ -35,9 +35,11 @@ static bool initialized = false;
 using namespace std;
 using gvirtus::communicators::UdpCommunicator;
 
-UdpCommunicator::UdpCommunicator(const std::string &communicator) {
+UdpCommunicator::UdpCommunicator(const std::string &communicator)
+{
 #ifdef _WIN32
-    if (!initialized) {
+    if (!initialized)
+    {
         WSADATA data;
         if (WSAStartup(MAKEWORD(2, 2), &data) != 0)
             throw runtime_error("Cannot initialized WinSock.");
@@ -51,11 +53,10 @@ UdpCommunicator::UdpCommunicator(const std::string &communicator) {
     // const char *portptr = strchr(valueptr, ':');
     // if (portptr == NULL) throw runtime_error("Port not specified.");
     // mPort = (short)strtol(portptr + 1, NULL, 10);
-    
+
     const size_t valueptr = communicator.find("://") + 3;
     const size_t portptr = communicator.find(":", valueptr);
-    mPort = static_cast<unsigned short>(std::stoi(communicator.substr(portptr +1)));
-
+    mPort = static_cast<unsigned short>(std::stoi(communicator.substr(portptr + 1)));
 
     mHostname = communicator.substr(valueptr, portptr - valueptr);
     struct hostent *ent = gethostbyname(mHostname.c_str());
@@ -67,7 +68,8 @@ UdpCommunicator::UdpCommunicator(const std::string &communicator) {
     memcpy(mInAddr, *ent->h_addr_list, mInAddrSize);
 }
 
-UdpCommunicator::UdpCommunicator(const char *hostname, unsigned short port) {
+UdpCommunicator::UdpCommunicator(const char *hostname, unsigned short port)
+{
     mHostname = string(hostname);
     struct hostent *ent = gethostbyname(hostname);
     if (ent == NULL)
@@ -78,17 +80,20 @@ UdpCommunicator::UdpCommunicator(const char *hostname, unsigned short port) {
     mPort = port;
 }
 
-UdpCommunicator::UdpCommunicator(int fd, const char *hostname) {
+UdpCommunicator::UdpCommunicator(int fd, const char *hostname)
+{
     mSocketFd = fd;
     InitializeStream();
 }
 
-UdpCommunicator::~UdpCommunicator() {
+UdpCommunicator::~UdpCommunicator()
+{
     //    close(mSocketFd);
     delete[] mInAddr;
 }
 
-void UdpCommunicator::Serve() {
+void UdpCommunicator::Serve()
+{
 #ifdef DEBUG
     printf("UdpCommunicator::Serve() called\n");
 #endif
@@ -117,7 +122,7 @@ void UdpCommunicator::Serve() {
     // len = sizeof(client_addr);
     // int listenResult = recvfrom(mSocketFd, nullptr, 0, MSG_WAITALL, ( struct sockaddr *) &client_addr, &len);
     // if (listenResult != 0)
-    //     throw runtime_error(    
+    //     throw runtime_error(
     //         "UdpCommunicator: Can't listen from socket: " + string(strerror(errno)) + ".");
 
 #ifdef DEBUG
@@ -125,7 +130,8 @@ void UdpCommunicator::Serve() {
 #endif
 }
 
-const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() const {
+const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() const
+{
 #ifdef DEBUG
     cout << "UdpCommunicator::Accept() called" << endl;
 #endif
@@ -137,11 +143,12 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
 #else
     int client_socket_addr_size;
 #endif
-        // Creating socket file descriptor 
-    if ( (client_socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
-        perror("socket creation failed"); 
-        exit(EXIT_FAILURE); 
-    } 
+    // Creating socket file descriptor
+    if ((client_socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
     memset((char *)&client_socket_addr, 0, sizeof(struct sockaddr_in));
     cout << "UdpCommunicator::Accept() wrote sock_addr: " << endl;
     client_socket_addr.sin_family = AF_INET;
@@ -149,11 +156,11 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
     client_socket_addr.sin_addr.s_addr = INADDR_ANY;
 
     cout << "UdpCommunicator::Accept() wrote ???: " << endl;
-    socklen_t len = sizeof(cliaddr);  //len is value/result 
-      
-    int n = recvfrom(mSocketFd, (char *)nullptr, 0,  
-                MSG_WAITALL, (struct sockaddr *) &cliaddr, 
-                &len);
+    socklen_t len = sizeof(cliaddr); // len is value/result
+
+    int n = recvfrom(mSocketFd, (char *)nullptr, 0,
+                     MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                     &len);
     cout << "UdpCommunicator::Accept() wrote !!!! " << endl;
     int on = 1;
     // if (setsockopt(client_sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
@@ -163,18 +170,28 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
 
     cout << "UdpCommunicator::Accept() set socket opt: " << endl;
 
-    if ( bind(client_socket_fd, (const struct sockaddr *)&client_socket_addr,  
-            sizeof(client_socket_addr)) < 0 ) 
-    { 
-        perror("bind failed"); 
-        exit(EXIT_FAILURE); 
+    if (bind(client_socket_fd, (const struct sockaddr *)&client_socket_addr,
+             sizeof(client_socket_addr)) < 0)
+    {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
     }
 
     cout << "UdpCommunicator::Accept() bind: " << endl;
 
     // socklen_t len;
-    len = sizeof(client_socket_addr);
-    connect(client_socket_fd, (sockaddr*)&cliaddr, len);
+    len = sizeof(cliaddr);
+    connect(client_socket_fd, (sockaddr *)&cliaddr, len);
+
+    // Send a 1-byte ACK so the client knows this per-client socket is fully
+    // bound and connected before it starts sending CUDA data.  Without this
+    // handshake there is a race: the client can send its first datagram before
+    // client_socket_fd is in the kernel socket table, causing the packet to be
+    // received by mSocketFd (the accept loop) and treated as a new handshake.
+    const char ack = 'A';
+    if (::send(client_socket_fd, &ack, 1, 0) < 0)
+        throw std::runtime_error("UdpCommunicator::Accept(): failed to send handshake ACK: " +
+                                 std::string(strerror(errno)));
 
 #ifdef DEBUG
     cout << "UdpCommunicator::Accept() client_socket_fd: " << client_socket_fd << endl;
@@ -182,7 +199,8 @@ const gvirtus::communicators::Communicator *const UdpCommunicator::Accept() cons
     return new UdpCommunicator(client_socket_fd, inet_ntoa(client_socket_addr.sin_addr));
 }
 
-void UdpCommunicator::Connect() {
+void UdpCommunicator::Connect()
+{
 #ifdef DEBUG
     cout << "UdpCommunicator::Connect() called " << endl;
 #endif
@@ -201,7 +219,16 @@ void UdpCommunicator::Connect() {
         throw runtime_error("UdpCommunicator: Can't connect to socket: " + string(strerror(errno)) +
                             ".");
     const char *hello = "Hello from client";
-    send(mSocketFd, hello, strlen(hello), MSG_CONFIRM);
+    send(mSocketFd, hello, strlen(hello), 0);
+
+    // Wait for the server's ACK before proceeding.  The server sends this ACK
+    // only after its per-client socket is bound and connected, which guarantees
+    // that subsequent datagrams we send will be routed to that socket and not
+    // to the server's accept-loop socket.
+    char ackBuf;
+    ssize_t ackLen = ::recv(mSocketFd, &ackBuf, 1, 0);
+    if (ackLen <= 0)
+        throw runtime_error("UdpCommunicator: Did not receive handshake ACK from server.");
 
     InitializeStream();
 
@@ -212,7 +239,8 @@ void UdpCommunicator::Connect() {
 
 void UdpCommunicator::Close() {}
 
-size_t UdpCommunicator::Read(char *buffer, size_t size) {
+size_t UdpCommunicator::Read(char *buffer, size_t size)
+{
 #ifdef DEBUG
     cout << "UdpCommunicator::Read() size: " << size << endl;
 #endif
@@ -220,7 +248,8 @@ size_t UdpCommunicator::Read(char *buffer, size_t size) {
     mpInput->read(buffer, size);
 
 #ifdef DEBUG
-    for (unsigned int i = 0; i < size; i++) printf("%d LETTO %02X\n", i, buffer[i]);
+    for (unsigned int i = 0; i < size; i++)
+        printf("%d LETTO %02X\n", i, buffer[i]);
 #endif
 
     size_t ret_value;
@@ -236,7 +265,8 @@ size_t UdpCommunicator::Read(char *buffer, size_t size) {
     return ret_value;
 }
 
-size_t UdpCommunicator::Write(const char *buffer, size_t size) {
+size_t UdpCommunicator::Write(const char *buffer, size_t size)
+{
 #ifdef DEBUG
     cout << "UdpCommunicator::Write() called" << endl;
 #endif
@@ -244,7 +274,8 @@ size_t UdpCommunicator::Write(const char *buffer, size_t size) {
     mpOutput->write(buffer, size);
 
 #ifdef DEBUG
-    for (unsigned int i = 0; i < size; i++) printf("%d SCRITTO %02X \n", i, buffer[i]);
+    for (unsigned int i = 0; i < size; i++)
+        printf("%d SCRITTO %02X \n", i, buffer[i]);
 #endif
 
 #ifdef DEBUG
@@ -256,7 +287,8 @@ size_t UdpCommunicator::Write(const char *buffer, size_t size) {
 
 void UdpCommunicator::Sync() { mpOutput->flush(); }
 
-void UdpCommunicator::InitializeStream() {
+void UdpCommunicator::InitializeStream()
+{
 
     mpInputBuf = new UdpStreamBuf(mSocketFd);
     mpOutputBuf = new UdpStreamBuf(mSocketFd);
@@ -265,7 +297,8 @@ void UdpCommunicator::InitializeStream() {
 }
 
 extern "C" std::shared_ptr<UdpCommunicator> create_communicator(
-    std::shared_ptr<gvirtus::communicators::Endpoint> end) {
+    std::shared_ptr<gvirtus::communicators::Endpoint> end)
+{
     std::string arg =
         "udp://" + std::dynamic_pointer_cast<gvirtus::communicators::Endpoint_Tcp>(end)->address() +
         ":" +
