@@ -1,10 +1,8 @@
-FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
+FROM frontend_base
 
-ENV DEBIAN_FRONTEND=noninteractive
 ENV GVIRTUS_HOME=/opt/GVirtuS
 ENV OPENPOSE_HOME=/opt/openpose
 ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
-
 
 # Prevent tzdata prompt and install dependencies
 RUN ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
@@ -49,13 +47,6 @@ RUN ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
 # # Install Python packages
 RUN pip3 install opencv-python
 
-# # Clone and build GVirtuS
-WORKDIR /opt
-RUN git clone https://github.com/ecn-aau/GVirtuS.git && \
-    cd GVirtuS && mkdir build && cd build && \
-    cmake -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} .. && \
-    make -j$(nproc) && make install
-
 # Clone and build OpenPose
 WORKDIR /opt
 RUN git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose.git
@@ -67,7 +58,7 @@ COPY cmake/Cuda.cmake ${OPENPOSE_HOME}/cmake/Cuda.cmake
 COPY caffe/ ${OPENPOSE_HOME}/3rdparty/caffe/
 
 # Optional: Copy models directory if needed
-# COPY models/ ${OPENPOSE_HOME}/models/
+COPY models/ ${OPENPOSE_HOME}/models/
 
 WORKDIR ${OPENPOSE_HOME}/build
 RUN cmake .. \
