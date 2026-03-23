@@ -7,11 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 RUN pip install --no-cache-dir \
-    torch \
-    torchvision \
+    torch torchvision --index-url https://download.pytorch.org/whl/cu126 \
+    && pip install --no-cache-dir \
     networkx \
     scipy \
-    opencv-python \
     gdown
 
 #Clone 2D-Human-Parsing and download pretrained model
@@ -30,8 +29,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pre-built 2D-Human-Parsing repo and all pip-installed packages from stage 1.
-# Copying the entire dist-packages covers torch, torchvision, networkx, scipy,
-# opencv-python, gdown, and all their transitive dependencies.
 COPY --from=human-parsing-builder /opt/2D-Human-Parsing /opt/2D-Human-Parsing
 COPY --from=human-parsing-builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
