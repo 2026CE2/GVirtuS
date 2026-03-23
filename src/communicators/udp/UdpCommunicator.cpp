@@ -7,7 +7,7 @@
  *
  *
  */
-// #define DEBUG
+#define DEBUG
 
 #include "UdpCommunicator.h"
 #include "UdpStreamBuf.hpp"
