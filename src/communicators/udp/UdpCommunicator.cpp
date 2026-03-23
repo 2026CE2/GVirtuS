@@ -94,6 +94,11 @@ UdpCommunicator::~UdpCommunicator()
 
 void UdpCommunicator::Serve()
 {
+
+    cout << "-----------DISCLAIMER-----------" << endl;
+    cout << "The UDP communicator was developed as a baseline for benchmarking and testing." << endl;
+    cout << "It is not optimized for performance or security, and should not be used in production environments without further enhancements." << endl;
+
 #ifdef DEBUG
     printf("UdpCommunicator::Serve() called\n");
 #endif
