@@ -24,3 +24,11 @@ ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${LD_LIBRARY_PATH}
 COPY ./docker/dev/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
+
+## MQTT BROKER
+RUN apt-get install libpaho-mqtt-dev \
+    git clone --branch v1.5.3 --depth 1 https://github.com/eclipse/paho.mqtt.cpp.git \
+    cd paho.mqtt.cpp \
+    cmake -Bbuild -H. -DPAHO_WITH_SSL=ON\  
+    sudo cmake --build build --target install
+

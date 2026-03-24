@@ -95,6 +95,20 @@ bool getstring(Communicator *c, string &s) {
             s += ch;
         }
         return false;
+
+    // mqtt
+    if (c->to_string() == "mqttcommunicator") {
+        // s = "";
+        // char ch = 0;
+        // while (c->Read(&ch, 1) == 1) {
+        //     // If reading is ended, return true
+        //     if (ch == 0) {
+        //         return true;
+        //     }
+        //     s += ch;
+        // }
+        return false;
+    
     } else if (c->to_string() == "rdmacommunicator") {
         try {
             s = "";
