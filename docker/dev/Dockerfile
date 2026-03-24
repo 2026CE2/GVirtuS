@@ -15,7 +15,7 @@ RUN apt update && apt install -y --no-install-recommends \
     libgtest-dev \
     liblz4-dev \
     cmake \
-    # MQTT broker dependency
+    # MQTT broker dependencies
     git \
     libpaho-mqtt-dev \
     libssl-dev \

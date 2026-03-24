@@ -95,21 +95,14 @@ bool getstring(Communicator *c, string &s) {
             s += ch;
         }
         return false;
-
-    // mqtt
-    if (c->to_string() == "mqttcommunicator") {
-        // s = "";
-        // char ch = 0;
-        // while (c->Read(&ch, 1) == 1) {
-        //     // If reading is ended, return true
-        //     if (ch == 0) {
-        //         return true;
-        //     }
-        //     s += ch;
-        // }
+     
+        // MQTT
+    }else if (c->to_string() == "mqttcommunicator") {
+        cout << 'mqttcommunicator detected' << endl;
+        }
         return false;
     
-    } else if (c->to_string() == "rdmacommunicator") {
+    }else if (c->to_string() == "rdmacommunicator") {
         try {
             s = "";
             size_t size = 30;
