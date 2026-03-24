@@ -1,18 +1,16 @@
 .PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-human-parsing-test
 
-docker-build-push-dev:
+docker-build-dev:
 	docker buildx build \
 		--platform linux/amd64 \
-		--push \
 		--no-cache \
 		-f docker/dev/Dockerfile \
 		-t taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
-docker-build-push-prod:
+docker-build-prod:
 	docker buildx build \
 		--platform linux/amd64 \
-		--push \
 		--no-cache \
 		-f docker/prod/Dockerfile \
 		-t taslanidis/gvirtus:cuda12.6.3-cudnn-ubuntu22.04 \
