@@ -41,6 +41,7 @@
 #include <thread>
 
 #include "communicators/hybrid/HybridCommunicator.h"
+#include "communicators/udp/UdpCommunicator.h"
 
 #define DEBUG
 
@@ -95,7 +96,20 @@ bool getstring(Communicator *c, string &s) {
             s += ch;
         }
         return false;
-    } else if (c->to_string() == "rdmacommunicator") {
+    } else if (c->to_string() == "udpcommunicator") {
+        s = "";
+        char ch = 0;
+        while (c->Read(&ch, 1) == 1) {
+            // If reading is ended, return true
+            std::cout << "Reading!" << std::endl;
+            if (ch == 0) {
+                return true;
+            }
+            s += ch;
+        }
+        return false;
+
+    }else if (c->to_string() == "rdmacommunicator") {
         try {
             s = "";
             size_t size = 30;
