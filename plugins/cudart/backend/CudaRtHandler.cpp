@@ -282,6 +282,7 @@ void CudaRtHandler::Initialize() {
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(PushCallConfiguration));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(PopCallConfiguration));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(LaunchKernel));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(LaunchCooperativeKernel));
     /* CudaRtHandler_internal */
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterFatBinary));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterFatBinaryEnd));
