@@ -21,7 +21,7 @@ RUN git clone https://github.com/fyviezhao/2D-Human-Parsing && \
 
 
 # Final stage: layer 2D-Human-Parsing on top of frontend_base.
-FROM gvirtus:cuda12.6 AS final
+FROM gvirtus_dependencies:cuda12.6 AS final
 ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

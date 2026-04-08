@@ -14,9 +14,28 @@ docker-build-gvirtus-dependencies:
 	docker buildx build \
 		--platform linux/amd64 \
 		--no-cache \
-		-f docker/dev/Dockerfile \
+		-f docker/dev/Dockerfile.base \
 		-t gvirtus_dependencies:cuda12.6 \
 		.
+
+docker-build-gvirtus-backend:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f docker/dev/Dockerfile \
+		-t gvirtus_backend \
+		.
+
+
+docker-build-gvirtus-frontend:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f docker/dev/Dockerfile.frontend \
+		-t gvirtus_frontend \
+		.
+
+
 
 # Runs the development container with all source code mounted, allowing for fast iteration without rebuilding the image.
 run-gvirtus-backend-dev:
@@ -39,7 +58,7 @@ run-gvirtus-backend-dev:
 		--name gvirtus \
 		--runtime=nvidia \
 		--shm-size=8G \
-		gvirtus_dependencies:cuda12.6
+		gvirtus_backend
 
 stop-gvirtus:
 	docker stop gvirtus || true
@@ -126,5 +145,5 @@ run-simple-matrix-test:
 		-v ./tools:/gvirtus/tools/ \
 		-v ./tests:/gvirtus/tests/ \
 		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
-		gvirtus:cuda12.6 \
+		gvirtus_frontend \
 		bash /opt/GVirtuS/frontend.sh
