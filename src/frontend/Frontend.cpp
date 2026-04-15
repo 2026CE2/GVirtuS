@@ -51,6 +51,7 @@
 #include "log4cplus/configurator.h"
 #include "log4cplus/logger.h"
 #include "log4cplus/loggingmacros.h"
+#include "gvirtus/common/Property.h"
 
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
@@ -130,9 +131,10 @@ void Frontend::Init(Communicator *c) {
 
     try {
         auto endpoint = EndpointFactory::get_endpoint(config_path);
+        gvirtus::common::Property _properties = common::JSON<gvirtus::common::Property>(config_path).parser();
 
         mpFrontends->find(tid)->second->_communicator =
-            CommunicatorFactory::get_communicator(endpoint);
+            CommunicatorFactory::get_communicator(endpoint, _properties.secure());
         mpFrontends->find(tid)->second->_communicator->obj_ptr()->Connect();
     } catch (const std::exception &e) {
         LOG4CPLUS_FATAL(logger, fs::path(__FILE__).filename()
@@ -178,8 +180,9 @@ Frontend::~Frontend() {
                           << it->second->mDataReceived / (1024 * 1024.0) << " Mb(s) in "
                           << it->second->mReceivingTime << " second(s)\n";
             }
-
-            delete it->second;
+            if (it->first != tid) {
+                delete it->second;
+            }
             it = mpFrontends->erase(it);
         }
 
@@ -323,6 +326,9 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
             hybrid->end_call();
         }
     }
+
+    std::cout << "[GVIRTUS] Routine '" << routine << "' executed with exit code " << exit_code
+              << " in " << server_exec_sec << " second(s)\n";
 }
 
 void Frontend::Prepare() {

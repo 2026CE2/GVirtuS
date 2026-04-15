@@ -14,9 +14,28 @@ docker-build-gvirtus-dependencies:
 	docker buildx build \
 		--platform linux/amd64 \
 		--no-cache \
-		-f docker/dev/Dockerfile \
+		-f docker/dev/Dockerfile.base \
 		-t gvirtus_dependencies:cuda12.6 \
 		.
+
+docker-build-gvirtus-backend:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f docker/dev/Dockerfile \
+		-t gvirtus_backend \
+		.
+
+
+docker-build-gvirtus-frontend:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f docker/dev/Dockerfile.frontend \
+		-t gvirtus_frontend \
+		.
+
+
 
 # Runs the development container with all source code mounted, allowing for fast iteration without rebuilding the image.
 run-gvirtus-backend-dev:
@@ -39,7 +58,7 @@ run-gvirtus-backend-dev:
 		--name gvirtus \
 		--runtime=nvidia \
 		--shm-size=8G \
-		gvirtus_dependencies:cuda12.6
+		gvirtus_backend
 
 stop-gvirtus:
 	docker stop gvirtus || true
@@ -118,5 +137,34 @@ run-simple-matrix-test:
 		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
 		-v ./examples/simple_matrix/frontend.sh:/opt/GVirtuS/frontend.sh \
-		gvirtus:cuda12.6 \
+		-v ./cmake:/gvirtus/cmake/ \
+		-v ./etc:/gvirtus/etc/ \
+		-v ./include:/gvirtus/include/ \
+		-v ./plugins:/gvirtus/plugins/ \
+		-v ./src:/gvirtus/src/ \
+		-v ./tools:/gvirtus/tools/ \
+		-v ./tests:/gvirtus/tests/ \
+		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
+		gvirtus_frontend \
+		bash /opt/GVirtuS/frontend.sh
+
+# Simple Matrix example.
+run-simple-matrix-paper-test:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_test_container_paper \
+		--network host \
+		-v ./examples/simple_matrix_paper/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/simple_matrix_paper:/opt/GVirtuS/examples/simple_matrix_paper \
+		-v ./examples/simple_matrix_paper/frontend.sh:/opt/GVirtuS/frontend.sh \
+		-v ./cmake:/gvirtus/cmake/ \
+		-v ./etc:/gvirtus/etc/ \
+		-v ./include:/gvirtus/include/ \
+		-v ./plugins:/gvirtus/plugins/ \
+		-v ./src:/gvirtus/src/ \
+		-v ./tools:/gvirtus/tools/ \
+		-v ./tests:/gvirtus/tests/ \
+		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
+		gvirtus_frontend \
 		bash /opt/GVirtuS/frontend.sh
