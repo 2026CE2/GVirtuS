@@ -147,3 +147,24 @@ run-simple-matrix-test:
 		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
 		gvirtus_frontend \
 		bash /opt/GVirtuS/frontend.sh
+
+# Simple Matrix example.
+run-simple-matrix-paper-test:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_test_container_paper \
+		--network host \
+		-v ./examples/simple_matrix_paper/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/simple_matrix_paper:/opt/GVirtuS/examples/simple_matrix_paper \
+		-v ./examples/simple_matrix_paper/frontend.sh:/opt/GVirtuS/frontend.sh \
+		-v ./cmake:/gvirtus/cmake/ \
+		-v ./etc:/gvirtus/etc/ \
+		-v ./include:/gvirtus/include/ \
+		-v ./plugins:/gvirtus/plugins/ \
+		-v ./src:/gvirtus/src/ \
+		-v ./tools:/gvirtus/tools/ \
+		-v ./tests:/gvirtus/tests/ \
+		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
+		gvirtus_frontend \
+		bash /opt/GVirtuS/frontend.sh
