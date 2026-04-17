@@ -366,4 +366,11 @@ void CudaRtHandler::Initialize() {
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(FuncSetCacheConfig));
     /* CudaRtHandler_api*/
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(FuncSetAttribute));
+    /* Cuda Graph Extensions*/
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphClone));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddDependencies));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphRemoveDependencies));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphGetEdges));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphGetRootNodes));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphDestroyNode));
 }

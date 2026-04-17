@@ -21,6 +21,9 @@ cuda_add_executable(launchKernel.e launchKernel.cu OPTIONS --cudart=shared)
 #set_target_properties(launchKernel.e PROPERTIES CUDA_RUNTIME_LIBRARY shared EXTRA_NVCCFLAGS --cudart=shared)
 install(TARGETS launchKernel.e RUNTIME DESTINATION ${GVIRTUS_HOME}/demo/cudart)
 
+cuda_add_executable(graphClone.e graphClone.cu OPTIONS --cudart=shared)
+install(TARGETS graphClone.e RUNTIME DESTINATION ${GVIRTUS_HOME}/demo/cudart)
+
 message(STATUS "COMPILING...")
 message(STATUS LD_LIBRARY_PATH ${LD_LIBRARY_PATH})
 message(STATUS EXTRA_NVCC_FLAGS ${EXTRA_NVCC_FLAGS})

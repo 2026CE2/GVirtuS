@@ -136,3 +136,123 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphUpload(cudaGraphExec_t graphE
     
     return CudaRtFrontend::GetExitCode();
 }
+
+// Extensions of the CUDA Graph APIs 
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphClone(cudaGraph_t* pGraphClone ,cudaGraph_t originalGraph) {
+
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(originalGraph);
+    CudaRtFrontend::Execute("cudaGraphClone");
+    
+
+    if (CudaRtFrontend::Success()){
+
+        *pGraphClone = CudaRtFrontend::GetOutputVariable<cudaGraph_t>();
+
+    }
+    return CudaRtFrontend::GetExitCode();
+
+
+
+}
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphAddDependencies(cudaGraph_t graph, const cudaGraphNode_t* from, const cudaGraphNode_t* to,/* const cudaGraphEdgeData* edgeData,*/ size_t numDependencies){
+
+    /*NOTE cudaGraphEdgeData is a v2 implementation of this instance. if the cuda version gets update then it can be implemented. */
+
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(graph);
+    CudaRtFrontend::AddVariableForArguments(numDependencies);
+
+    //Could add if condition depending on size of number of dependencies 
+    
+    
+    CudaRtFrontend::AddHostPointerForArguments(from,numDependencies);
+    CudaRtFrontend::AddHostPointerForArguments(to,numDependencies);
+    
+    CudaRtFrontend::Execute("cudaGraphAddDependencies");
+
+    return CudaRtFrontend::GetExitCode();
+
+
+
+
+}
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphRemoveDependencies(cudaGraph_t graph, const cudaGraphNode_t* from, const cudaGraphNode_t* to,/* const cudaGraphEdgeData* edgeData,*/ size_t numDependencies){
+
+    /*NOTE cudaGraphEdgeData is a v2 implementation of this instance. if the cuda version gets update then it can be implemented. */
+
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(graph);
+    CudaRtFrontend::AddVariableForArguments(numDependencies);
+
+    //Could add if condition depending on size of number of dependencies 
+    
+    
+    CudaRtFrontend::AddHostPointerForArguments(from,numDependencies);
+    CudaRtFrontend::AddHostPointerForArguments(to,numDependencies);
+    
+    CudaRtFrontend::Execute("cudaGraphRemoveDependencies");
+
+    return CudaRtFrontend::GetExitCode();
+
+}
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphGetEdges(cudaGraph_t graph, cudaGraphNode_t* from, cudaGraphNode_t* to, size_t* numEdges){
+    //Edge data can be introduced as a v2 implementation. Depends on cuda version
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(graph);
+
+    size_t requested = (numEdges ? *numEdges : 0);
+    CudaRtFrontend::AddVariableForArguments(requested);
+
+    //output buffers
+    CudaRtFrontend::AddHostPointerForArguments(from,requested);
+    CudaRtFrontend::AddHostPointerForArguments(to,requested);
+
+    CudaRtFrontend::Execute("cudaGraphGetEdges");
+    if (CudaRtFrontend::Success() && numEdges){
+        *numEdges = CudaRtFrontend::GetOutputVariable<size_t>();
+    }
+    return CudaRtFrontend::GetExitCode();
+
+}
+
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphGetRootNodes(cudaGraph_t graph,cudaGraphNode_t* pRootNodes, size_t* pNumRootNodes){
+
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(graph);
+
+
+    size_t requested = (pNumRootNodes ? *pNumRootNodes : 0);
+    CudaRtFrontend::AddVariableForArguments(requested);
+    CudaRtFrontend::AddHostPointerForArguments(pRootNodes, requested);
+
+    CudaRtFrontend::Execute("cudaGraphGetRootNodes");
+
+    if(CudaRtFrontend::Success() && pNumRootNodes){
+        *pNumRootNodes = CudaRtFrontend::GetOutputVariable<size_t>();
+
+
+
+    }
+    return CudaRtFrontend::GetExitCode();
+}
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphDestroyNode(cudaGraphNode_t node){
+    CudaRtFrontend::Prepare();
+
+    CudaRtFrontend::AddDevicePointerForArguments(node);
+    CudaRtFrontend::Execute("cudaGraphDestroyNode");
+
+    return CudaRtFrontend::GetExitCode();
+
+
+
+}
+
+
+

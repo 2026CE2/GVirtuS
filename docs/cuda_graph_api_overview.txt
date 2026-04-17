@@ -1,0 +1,280 @@
+CUDA Graph API Coverage Overview for GVirtuS (cudart plugin)
+Date: 2026-04-08
+
+Repository scope reviewed:
+- plugins/cudart/frontend/CudaRt_graph.cpp
+- plugins/cudart/backend/CudaRtHandler_graph.cpp
+- plugins/cudart/backend/CudaRtHandler.h
+- plugins/cudart/backend/CudaRtHandler.cpp
+
+Reference API set:
+- NVIDIA CUDA Runtime API, Graph Management (CUDA 12.6.1)
+  https://docs.nvidia.com/cuda/archive/12.6.1/cuda-runtime-api/group__CUDART__GRAPH.html
+
+-----------------------------------------------------------------------
+1) CURRENT STATUS IN THIS REPO
+-----------------------------------------------------------------------
+Implemented end-to-end (frontend + backend handler):
+- cudaGraphCreate
+- cudaGraphDestroy
+- cudaGraphGetNodes
+- cudaGraphInstantiate
+- cudaGraphInstantiateWithFlags
+- cudaGraphLaunch
+- cudaGraphExecDestroy
+- cudaGraphUpload
+
+Partially implemented:
+- cudaGraphDebugDotPrint (frontend exists, backend handler not registered/implemented)
+
+Known bug to fix immediately:
+- Frontend cudaGraphUpload dispatches "cudaGraphLaunch" instead of
+  "cudaGraphUpload".
+
+-----------------------------------------------------------------------
+2) MISSING GRAPH APIS (GROUPED)
+-----------------------------------------------------------------------
+A. Core graph structure and dependency management
+- cudaGraphClone
+- cudaGraphDestroyNode
+- cudaGraphAddDependencies
+- cudaGraphAddDependencies_v2
+- cudaGraphRemoveDependencies
+- cudaGraphRemoveDependencies_v2
+- cudaGraphGetEdges
+- cudaGraphGetEdges_v2
+- cudaGraphGetRootNodes
+- cudaGraphNodeGetDependencies
+- cudaGraphNodeGetDependencies_v2
+- cudaGraphNodeGetDependentNodes
+- cudaGraphNodeGetDependentNodes_v2
+- cudaGraphNodeGetType
+- cudaGraphNodeFindInClone
+
+B. Node creation APIs (building graphs)
+- cudaGraphAddEmptyNode
+- cudaGraphAddChildGraphNode
+- cudaGraphChildGraphNodeGetGraph
+- cudaGraphAddKernelNode
+- cudaGraphAddHostNode
+- cudaGraphAddMemcpyNode
+- cudaGraphAddMemcpyNode1D
+- cudaGraphAddMemcpyNodeFromSymbol
+- cudaGraphAddMemcpyNodeToSymbol
+- cudaGraphAddMemsetNode
+- cudaGraphAddEventRecordNode
+- cudaGraphAddEventWaitNode
+- cudaGraphAddExternalSemaphoresSignalNode
+- cudaGraphAddExternalSemaphoresWaitNode
+- cudaGraphAddMemAllocNode
+- cudaGraphAddMemFreeNode
+- cudaGraphAddNode
+- cudaGraphAddNode_v2
+
+C. Node parameter get/set APIs (non-exec graph nodes)
+- cudaGraphKernelNodeGetParams
+- cudaGraphKernelNodeSetParams
+- cudaGraphKernelNodeGetAttribute
+- cudaGraphKernelNodeSetAttribute
+- cudaGraphKernelNodeCopyAttributes
+- cudaGraphHostNodeGetParams
+- cudaGraphHostNodeSetParams
+- cudaGraphMemcpyNodeGetParams
+- cudaGraphMemcpyNodeSetParams
+- cudaGraphMemcpyNodeSetParams1D
+- cudaGraphMemcpyNodeSetParamsFromSymbol
+- cudaGraphMemcpyNodeSetParamsToSymbol
+- cudaGraphMemsetNodeGetParams
+- cudaGraphMemsetNodeSetParams
+- cudaGraphEventRecordNodeGetEvent
+- cudaGraphEventRecordNodeSetEvent
+- cudaGraphEventWaitNodeGetEvent
+- cudaGraphEventWaitNodeSetEvent
+- cudaGraphExternalSemaphoresSignalNodeGetParams
+- cudaGraphExternalSemaphoresSignalNodeSetParams
+- cudaGraphExternalSemaphoresWaitNodeGetParams
+- cudaGraphExternalSemaphoresWaitNodeSetParams
+- cudaGraphMemAllocNodeGetParams
+- cudaGraphMemFreeNodeGetParams
+- cudaGraphNodeSetParams
+
+D. Executable graph update/control APIs
+- cudaGraphInstantiateWithParams
+- cudaGraphExecUpdate
+- cudaGraphExecGetFlags
+- cudaGraphExecChildGraphNodeSetParams
+- cudaGraphExecKernelNodeSetParams
+- cudaGraphExecHostNodeSetParams
+- cudaGraphExecMemcpyNodeSetParams
+- cudaGraphExecMemcpyNodeSetParams1D
+- cudaGraphExecMemcpyNodeSetParamsFromSymbol
+- cudaGraphExecMemcpyNodeSetParamsToSymbol
+- cudaGraphExecMemsetNodeSetParams
+- cudaGraphExecEventRecordNodeSetEvent
+- cudaGraphExecEventWaitNodeSetEvent
+- cudaGraphExecExternalSemaphoresSignalNodeSetParams
+- cudaGraphExecExternalSemaphoresWaitNodeSetParams
+- cudaGraphExecNodeSetParams
+- cudaGraphNodeGetEnabled
+- cudaGraphNodeSetEnabled
+
+E. Graph memory, user object, and conditional APIs
+- cudaDeviceGetGraphMemAttribute
+- cudaDeviceSetGraphMemAttribute
+- cudaDeviceGraphMemTrim
+- cudaUserObjectCreate
+- cudaUserObjectRetain
+- cudaUserObjectRelease
+- cudaGraphRetainUserObject
+- cudaGraphReleaseUserObject
+- cudaGraphConditionalHandleCreate
+
+F. Device-side graph helper APIs (optional for runtime virtualization path)
+- cudaGetCurrentGraphExec
+- cudaGraphSetConditional
+- cudaGraphKernelNodeSetEnabled (device)
+- cudaGraphKernelNodeSetGridDim (device)
+- cudaGraphKernelNodeSetParam (device)
+- cudaGraphKernelNodeUpdatesApply (device)
+
+-----------------------------------------------------------------------
+3) IMPLEMENTATION DEPENDENCIES (WHAT DEPENDS ON WHAT)
+-----------------------------------------------------------------------
+Dependency legend:
+- "Requires" = should be implemented first for meaningful validation.
+
+Foundational dependencies:
+- Most graph APIs require: cudaGraphCreate + cudaGraphDestroy.
+- Exec update APIs require: cudaGraphInstantiate or cudaGraphInstantiateWithFlags.
+- Node-set/get APIs require corresponding node creation APIs first.
+
+Detailed dependency map:
+- Dependency-edge APIs
+  Requires: graph creation
+  APIs: AddDependencies/RemoveDependencies/GetEdges + v2 variants
+
+- Graph/node query APIs
+  Requires: at least one node creation API
+  APIs: GetRootNodes, NodeGetDependencies, NodeGetDependentNodes, NodeGetType
+
+- Child-graph APIs
+  Requires: GraphCreate + AddChildGraphNode
+  APIs: ChildGraphNodeGetGraph, ExecChildGraphNodeSetParams
+
+- Kernel node param APIs
+  Requires: AddKernelNode
+  APIs: KernelNodeGet/SetParams, KernelNodeGet/SetAttribute,
+        KernelNodeCopyAttributes, ExecKernelNodeSetParams
+
+- Host node param APIs
+  Requires: AddHostNode
+  APIs: HostNodeGet/SetParams, ExecHostNodeSetParams
+
+- Memcpy node param APIs
+  Requires: AddMemcpyNode/AddMemcpyNode1D/(To|From)Symbol
+  APIs: MemcpyNodeGet/SetParams, MemcpyNodeSetParams1D,
+        MemcpyNodeSetParams(To|From)Symbol,
+        ExecMemcpyNodeSetParams variants
+
+- Memset node param APIs
+  Requires: AddMemsetNode
+  APIs: MemsetNodeGet/SetParams, ExecMemsetNodeSetParams
+
+- Event node APIs
+  Requires: AddEventRecordNode / AddEventWaitNode
+  APIs: EventRecordNodeGet/SetEvent, EventWaitNodeGet/SetEvent,
+        ExecEventRecordNodeSetEvent, ExecEventWaitNodeSetEvent
+
+- External semaphore node APIs
+  Requires: AddExternalSemaphores(Signal|Wait)Node
+  APIs: ExternalSemaphores(Signal|Wait)NodeGet/SetParams,
+        ExecExternalSemaphores(Signal|Wait)NodeSetParams
+
+- Memory alloc/free node query APIs
+  Requires: AddMemAllocNode / AddMemFreeNode
+  APIs: MemAllocNodeGetParams, MemFreeNodeGetParams
+
+- Generic node APIs
+  Requires: AddNode/AddNode_v2
+  APIs: NodeSetParams, ExecNodeSetParams
+
+- Exec update APIs
+  Requires: Instantiate + graph/node mutation path
+  APIs: InstantiateWithParams, ExecUpdate, ExecGetFlags, NodeGetEnabled,
+        NodeSetEnabled
+
+- User object APIs
+  Independent of node type but usually exercised with graph lifecycle
+  APIs: UserObjectCreate/Retain/Release + GraphRetain/ReleaseUserObject
+
+- Graph memory attribute APIs
+  Independent of graph topology
+  APIs: DeviceGetGraphMemAttribute, DeviceSetGraphMemAttribute,
+        DeviceGraphMemTrim
+
+-----------------------------------------------------------------------
+4) RECOMMENDED ORDER TO IMPLEMENT
+-----------------------------------------------------------------------
+Phase 0: correctness fixes
+1. Fix frontend dispatch bug: cudaGraphUpload -> Execute("cudaGraphUpload")
+2. Add backend support for cudaGraphDebugDotPrint
+
+Phase 1: minimal graph topology control
+3. cudaGraphClone
+4. cudaGraphAddDependencies
+5. cudaGraphRemoveDependencies
+6. cudaGraphGetEdges
+7. cudaGraphGetRootNodes
+8. cudaGraphDestroyNode
+
+Phase 2: minimal node creation set (high ROI)
+9.  cudaGraphAddKernelNode
+10. cudaGraphAddMemcpyNode / cudaGraphAddMemcpyNode1D
+11. cudaGraphAddMemsetNode
+12. cudaGraphAddEmptyNode
+13. cudaGraphAddHostNode
+
+Phase 3: node introspection and basic mutation
+14. cudaGraphNodeGetType
+15. cudaGraphNodeGetDependencies / cudaGraphNodeGetDependentNodes
+16. cudaGraphKernelNodeGetParams / cudaGraphKernelNodeSetParams
+17. cudaGraphMemcpyNodeGetParams / cudaGraphMemcpyNodeSetParams
+18. cudaGraphMemsetNodeGetParams / cudaGraphMemsetNodeSetParams
+19. cudaGraphHostNodeGetParams / cudaGraphHostNodeSetParams
+
+Phase 4: executable graph update path
+20. cudaGraphExecGetFlags
+21. cudaGraphExecKernelNodeSetParams
+22. cudaGraphExecMemcpyNodeSetParams
+23. cudaGraphExecMemsetNodeSetParams
+24. cudaGraphExecHostNodeSetParams
+25. cudaGraphExecUpdate
+26. cudaGraphInstantiateWithParams
+
+Phase 5: advanced graph features
+27. Event node add/get/set + exec variants
+28. External semaphore node add/get/set + exec variants
+29. Child graph node APIs
+30. Mem alloc/free node APIs
+31. Generic AddNode/NodeSetParams APIs
+32. Node enable/disable APIs in graphExec
+
+Phase 6: graph memory + user objects + conditionals
+33. Device graph memory attribute APIs
+34. User object APIs + graph retain/release APIs
+35. Conditional handle API
+
+Phase 7: v2 and device-side APIs
+36. *_v2 dependency/edge APIs
+37. Device-side helpers (only if required by your virtualization model)
+
+-----------------------------------------------------------------------
+5) PRIORITY SUGGESTION (IF YOU WANT FAST PRACTICAL COVERAGE)
+-----------------------------------------------------------------------
+Implement first:
+- AddKernelNode, AddMemcpyNode(1D), AddMemsetNode, AddHostNode
+- Kernel/Memcpy/Memset/Host node get/set params
+- ExecKernel/Memcpy/Memset/HostNodeSetParams + ExecUpdate
+- AddDependencies/RemoveDependencies/GetEdges/GetRootNodes
+
+This combination unlocks most real-world graph capture/edit/replay workflows.

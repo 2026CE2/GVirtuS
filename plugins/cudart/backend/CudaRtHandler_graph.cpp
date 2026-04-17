@@ -136,3 +136,147 @@ CUDA_ROUTINE_HANDLER(GraphUpload) {
         return std::make_shared<Result>(cudaErrorMemoryAllocation);
     }
 }
+
+CUDA_ROUTINE_HANDLER(GraphClone) {
+    try {
+        cudaGraph_t pGraphClone;
+        cudaGraph_t originalGraph = input_buffer->Get<cudaGraph_t>();
+        cudaError_t exit_code = cudaGraphClone(&pGraphClone,originalGraph);
+        std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
+        out->Add<cudaGraph_t>(pGraphClone);
+        return std::make_shared<Result>(exit_code, out);
+    } catch (const std::exception& e) {
+        cerr << e.what() << endl;
+        return std::make_shared<Result>(cudaErrorMemoryAllocation);
+
+    }
+
+
+}
+
+CUDA_ROUTINE_HANDLER(GraphAddDependencies){
+    try {
+        cudaGraph_t graph = input_buffer->Get<cudaGraph_t>();
+
+        size_t numDependencies = input_buffer->Get<size_t>();
+
+        cudaGraphNode_t* from = input_buffer->Assign<cudaGraphNode_t>(numDependencies);
+        cudaGraphNode_t* to = input_buffer->Assign<cudaGraphNode_t>(numDependencies);
+
+        cudaError_t exit_code = cudaGraphAddDependencies(graph,from,to,numDependencies);
+
+        return std::make_shared<Result>(exit_code);
+
+
+
+    }catch (const std::exception& e){
+        cerr << e.what() << endl;
+        return std::make_shared<Result>(cudaErrorInvalidValue);
+    }
+
+
+
+}
+
+CUDA_ROUTINE_HANDLER(GraphRemoveDependencies){
+    try {
+        cudaGraph_t graph = input_buffer->Get<cudaGraph_t>();
+
+        size_t numDependencies = input_buffer->Get<size_t>();
+
+        cudaGraphNode_t* from = input_buffer->Assign<cudaGraphNode_t>(numDependencies);
+        cudaGraphNode_t* to = input_buffer->Assign<cudaGraphNode_t>(numDependencies);
+
+        cudaError_t exit_code = cudaGraphRemoveDependencies(graph,from,to,numDependencies);
+
+        return std::make_shared<Result>(exit_code);
+
+
+
+    }catch (const std::exception& e){
+        cerr << e.what() << endl;
+        return std::make_shared<Result>(cudaErrorInvalidValue);
+    }
+
+
+
+}
+
+CUDA_ROUTINE_HANDLER(GraphGetEdges){
+
+    try {
+        cudaGraph_t graph = input_buffer->Get<cudaGraph_t>();
+
+        size_t requested = input_buffer->Get<size_t>();
+
+        cudaGraphNode_t* from = input_buffer->Assign<cudaGraphNode_t>(requested);
+        cudaGraphNode_t* to = input_buffer->Assign<cudaGraphNode_t>(requested);
+        size_t numEdges = requested;
+        cudaError_t exit_code = cudaGraphGetEdges(graph,from,to,&numEdges);
+
+        std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
+        out->Add<size_t>(numEdges);
+
+
+        return std::make_shared<Result>(exit_code,out);
+    }
+    catch (const std::exception& e){
+        cerr << e.what() << endl;
+        return std::make_shared<Result>(cudaErrorInvalidValue);
+
+    }
+
+}
+
+CUDA_ROUTINE_HANDLER(GraphGetRootNodes){
+    try {cudaGraph_t graph = input_buffer->Get<cudaGraph_t>();
+    
+        size_t requested = input_buffer->Get<size_t>();
+
+        cudaGraphNode_t* pRootNodes = input_buffer->Assign<cudaGraphNode_t>(requested);
+
+        size_t NumRootNodes = requested;
+
+        cudaError_t exit_code = cudaGraphGetRootNodes(graph,pRootNodes,&NumRootNodes);
+
+        std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
+
+        out->Add<size_t>(NumRootNodes);
+
+        return std::make_shared<Result>(exit_code,out);
+    
+    
+    }
+    catch(const std::exception& e){
+        cerr << e.what() << endl;
+        return std::make_shared<Result>(cudaErrorMemoryAllocation);
+    }
+}
+
+
+CUDA_ROUTINE_HANDLER(GraphDestroyNode){
+    try {
+        cudaGraphNode_t node = input_buffer->Get<cudaGraphNode_t>();
+    
+        cudaError_t exit_code = cudaGraphDestroyNode(node);
+
+        return std::make_shared<Result>(exit_code);
+        
+        
+    }catch(const std::exception& e){
+        cerr << e.what() << endl;
+        return std::make_shared<Result>(cudaErrorInvalidValue);
+
+
+    }
+
+
+
+
+
+
+}
+
+/*TODO add Batch 1
+`cudaGraphAddDependencies`, `cudaGraphRemoveDependencies`, `cudaGraphGetEdges`,
+`cudaGraphGetRootNodes`, `cudaGraphDestroyNode`*/

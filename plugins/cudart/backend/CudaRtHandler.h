@@ -299,4 +299,11 @@ CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessorWithFlags);
 /* CudaRtHandler_api */
 CUDA_ROUTINE_HANDLER(FuncSetAttribute);
 
+/* Cuda Graph Extensions*/
+CUDA_ROUTINE_HANDLER(GraphClone);
+CUDA_ROUTINE_HANDLER(GraphAddDependencies);
+CUDA_ROUTINE_HANDLER(GraphRemoveDependencies);
+CUDA_ROUTINE_HANDLER(GraphGetEdges);
+CUDA_ROUTINE_HANDLER(GraphGetRootNodes);
+CUDA_ROUTINE_HANDLER(GraphDestroyNode);
 #endif /* _CUDARTHANDLER_H */

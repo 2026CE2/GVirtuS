@@ -1,0 +1,846 @@
+%!PS-Adobe-3.0
+/F {/Courier findfont 9 scalefont setfont} def
+F
+/y 800 def
+/newpage {showpage F /y 800 def} def
+72 y moveto (CUDA Graph API Coverage Overview for GVirtuS \(cudart plugin\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Date: 2026-04-08) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Repository scope reviewed:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- plugins/cudart/frontend/CudaRt_graph.cpp) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- plugins/cudart/backend/CudaRtHandler_graph.cpp) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- plugins/cudart/backend/CudaRtHandler.h) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- plugins/cudart/backend/CudaRtHandler.cpp) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Reference API set:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- NVIDIA CUDA Runtime API, Graph Management \(CUDA 12.6.1\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  https://docs.nvidia.com/cuda/archive/12.6.1/cuda-runtime-api/group__CUDART__GRAPH.html) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (1\) CURRENT STATUS IN THIS REPO) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Implemented end-to-end \(frontend + backend handler\):) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphCreate) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphDestroy) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphGetNodes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphInstantiate) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphInstantiateWithFlags) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphLaunch) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecDestroy) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphUpload) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Partially implemented:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphDebugDotPrint \(frontend exists, backend handler not registered/implemented\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Known bug to fix immediately:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Frontend cudaGraphUpload dispatches "cudaGraphLaunch" instead of) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  "cudaGraphUpload".) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (2\) MISSING GRAPH APIS \(GROUPED\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (A. Core graph structure and dependency management) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphClone) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphDestroyNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddDependencies) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddDependencies_v2) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphRemoveDependencies) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphRemoveDependencies_v2) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphGetEdges) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphGetEdges_v2) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphGetRootNodes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeGetDependencies) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeGetDependencies_v2) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeGetDependentNodes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeGetDependentNodes_v2) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeGetType) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeFindInClone) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (B. Node creation APIs \(building graphs\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddEmptyNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddChildGraphNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphChildGraphNodeGetGraph) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddKernelNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddHostNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddMemcpyNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddMemcpyNode1D) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddMemcpyNodeFromSymbol) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddMemcpyNodeToSymbol) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddMemsetNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddEventRecordNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddEventWaitNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddExternalSemaphoresSignalNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddExternalSemaphoresWaitNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddMemAllocNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddMemFreeNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphAddNode_v2) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (C. Node parameter get/set APIs \(non-exec graph nodes\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeGetAttribute) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeSetAttribute) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeCopyAttributes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphHostNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphHostNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemcpyNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemcpyNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemcpyNodeSetParams1D) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemcpyNodeSetParamsFromSymbol) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemcpyNodeSetParamsToSymbol) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemsetNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemsetNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphEventRecordNodeGetEvent) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphEventRecordNodeSetEvent) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphEventWaitNodeGetEvent) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphEventWaitNodeSetEvent) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExternalSemaphoresSignalNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExternalSemaphoresSignalNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExternalSemaphoresWaitNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExternalSemaphoresWaitNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemAllocNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphMemFreeNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (D. Executable graph update/control APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphInstantiateWithParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecUpdate) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecGetFlags) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecChildGraphNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecKernelNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecHostNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecMemcpyNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecMemcpyNodeSetParams1D) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecMemcpyNodeSetParamsFromSymbol) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecMemcpyNodeSetParamsToSymbol) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecMemsetNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecEventRecordNodeSetEvent) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecEventWaitNodeSetEvent) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecExternalSemaphoresSignalNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecExternalSemaphoresWaitNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphExecNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeGetEnabled) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphNodeSetEnabled) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (E. Graph memory, user object, and conditional APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaDeviceGetGraphMemAttribute) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaDeviceSetGraphMemAttribute) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaDeviceGraphMemTrim) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaUserObjectCreate) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaUserObjectRetain) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaUserObjectRelease) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphRetainUserObject) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphReleaseUserObject) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphConditionalHandleCreate) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (F. Device-side graph helper APIs \(optional for runtime virtualization path\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGetCurrentGraphExec) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphSetConditional) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeSetEnabled \(device\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeSetGridDim \(device\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeSetParam \(device\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- cudaGraphKernelNodeUpdatesApply \(device\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (3\) IMPLEMENTATION DEPENDENCIES \(WHAT DEPENDS ON WHAT\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Dependency legend:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- "Requires" = should be implemented first for meaningful validation.) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Foundational dependencies:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Most graph APIs require: cudaGraphCreate + cudaGraphDestroy.) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Exec update APIs require: cudaGraphInstantiate or cudaGraphInstantiateWithFlags.) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Node-set/get APIs require corresponding node creation APIs first.) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Detailed dependency map:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Dependency-edge APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: graph creation) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: AddDependencies/RemoveDependencies/GetEdges + v2 variants) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Graph/node query APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: at least one node creation API) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: GetRootNodes, NodeGetDependencies, NodeGetDependentNodes, NodeGetType) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Child-graph APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: GraphCreate + AddChildGraphNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: ChildGraphNodeGetGraph, ExecChildGraphNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Kernel node param APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddKernelNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: KernelNodeGet/SetParams, KernelNodeGet/SetAttribute,) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (        KernelNodeCopyAttributes, ExecKernelNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Host node param APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddHostNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: HostNodeGet/SetParams, ExecHostNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Memcpy node param APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddMemcpyNode/AddMemcpyNode1D/\(To|From\)Symbol) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: MemcpyNodeGet/SetParams, MemcpyNodeSetParams1D,) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (        MemcpyNodeSetParams\(To|From\)Symbol,) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (        ExecMemcpyNodeSetParams variants) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Memset node param APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddMemsetNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: MemsetNodeGet/SetParams, ExecMemsetNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Event node APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddEventRecordNode / AddEventWaitNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: EventRecordNodeGet/SetEvent, EventWaitNodeGet/SetEvent,) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (        ExecEventRecordNodeSetEvent, ExecEventWaitNodeSetEvent) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- External semaphore node APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddExternalSemaphores\(Signal|Wait\)Node) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: ExternalSemaphores\(Signal|Wait\)NodeGet/SetParams,) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (        ExecExternalSemaphores\(Signal|Wait\)NodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Memory alloc/free node query APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddMemAllocNode / AddMemFreeNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: MemAllocNodeGetParams, MemFreeNodeGetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Generic node APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: AddNode/AddNode_v2) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: NodeSetParams, ExecNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Exec update APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Requires: Instantiate + graph/node mutation path) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: InstantiateWithParams, ExecUpdate, ExecGetFlags, NodeGetEnabled,) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (        NodeSetEnabled) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- User object APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Independent of node type but usually exercised with graph lifecycle) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: UserObjectCreate/Retain/Release + GraphRetain/ReleaseUserObject) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Graph memory attribute APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  Independent of graph topology) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (  APIs: DeviceGetGraphMemAttribute, DeviceSetGraphMemAttribute,) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (        DeviceGraphMemTrim) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (4\) RECOMMENDED ORDER TO IMPLEMENT) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 0: correctness fixes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (1. Fix frontend dispatch bug: cudaGraphUpload -> Execute\("cudaGraphUpload"\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (2. Add backend support for cudaGraphDebugDotPrint) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 1: minimal graph topology control) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (3. cudaGraphClone) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (4. cudaGraphAddDependencies) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (5. cudaGraphRemoveDependencies) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (6. cudaGraphGetEdges) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (7. cudaGraphGetRootNodes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (8. cudaGraphDestroyNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 2: minimal node creation set \(high ROI\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (9.  cudaGraphAddKernelNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (10. cudaGraphAddMemcpyNode / cudaGraphAddMemcpyNode1D) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (11. cudaGraphAddMemsetNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (12. cudaGraphAddEmptyNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (13. cudaGraphAddHostNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 3: node introspection and basic mutation) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (14. cudaGraphNodeGetType) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (15. cudaGraphNodeGetDependencies / cudaGraphNodeGetDependentNodes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (16. cudaGraphKernelNodeGetParams / cudaGraphKernelNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (17. cudaGraphMemcpyNodeGetParams / cudaGraphMemcpyNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (18. cudaGraphMemsetNodeGetParams / cudaGraphMemsetNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (19. cudaGraphHostNodeGetParams / cudaGraphHostNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 4: executable graph update path) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (20. cudaGraphExecGetFlags) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (21. cudaGraphExecKernelNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (22. cudaGraphExecMemcpyNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (23. cudaGraphExecMemsetNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (24. cudaGraphExecHostNodeSetParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (25. cudaGraphExecUpdate) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (26. cudaGraphInstantiateWithParams) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 5: advanced graph features) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (27. Event node add/get/set + exec variants) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (28. External semaphore node add/get/set + exec variants) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (29. Child graph node APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (30. Mem alloc/free node APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (31. Generic AddNode/NodeSetParams APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (32. Node enable/disable APIs in graphExec) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 6: graph memory + user objects + conditionals) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (33. Device graph memory attribute APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (34. User object APIs + graph retain/release APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (35. Conditional handle API) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Phase 7: v2 and device-side APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (36. *_v2 dependency/edge APIs) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (37. Device-side helpers \(only if required by your virtualization model\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (5\) PRIORITY SUGGESTION \(IF YOU WANT FAST PRACTICAL COVERAGE\)) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (-----------------------------------------------------------------------) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (Implement first:) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- AddKernelNode, AddMemcpyNode\(1D\), AddMemsetNode, AddHostNode) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- Kernel/Memcpy/Memset/Host node get/set params) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- ExecKernel/Memcpy/Memset/HostNodeSetParams + ExecUpdate) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (- AddDependencies/RemoveDependencies/GetEdges/GetRootNodes) show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto () show
+/y y 12 sub def
+y 40 lt {newpage} if
+72 y moveto (This combination unlocks most real-world graph capture/edit/replay workflows.) show
+/y y 12 sub def
+y 40 lt {newpage} if
+showpage
