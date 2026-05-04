@@ -1,12 +1,12 @@
 {
   "quic_settings": {
-    "IdleTimeoutMs": 5000,
+    "IdleTimeoutMs": 1000,
     "IsSet_IdleTimeoutMs": true,
 
-    "HandshakeIdleTimeoutMs": 2000,
+    "HandshakeIdleTimeoutMs": 500,
     "IsSet_HandshakeIdleTimeoutMs": true,
 
-    "DisconnectTimeoutMs": 5000,
+    "DisconnectTimeoutMs": 1000,
     "IsSet_DisconnectTimeoutMs": true,
 
     "KeepAliveIntervalMs": 0,
@@ -24,13 +24,13 @@
     "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
     "IsSet_ServerResumptionLevel": true,
 
-    "InitialWindowPackets": 200,
+    "InitialWindowPackets": 1000,
     "IsSet_InitialWindowPackets": true,
 
-    "SendBufferingEnabled": 0,
+    "SendBufferingEnabled": 1,
     "IsSet_SendBufferingEnabled": true,
 
-    "PacingEnabled": 0,
+    "PacingEnabled": 1,
     "IsSet_PacingEnabled": true,
 
     "MigrationEnabled": 0,
@@ -42,7 +42,7 @@
     "MaxAckDelayMs": 1,
     "IsSet_MaxAckDelayMs": true,
 
-    "StreamRecvWindowDefault": 33554432,
+    "StreamRecvWindowDefault": 8388608,
     "IsSet_StreamRecvWindowDefault": true,
 
     "StreamRecvBufferDefault": 0,
@@ -51,7 +51,7 @@
     "ConnFlowControlWindow": 67108864,
     "IsSet_ConnFlowControlWindow": true,
 
-    "MaxWorkerQueueDelayUs": 50,
+    "MaxWorkerQueueDelayUs": 100,
     "IsSet_MaxWorkerQueueDelayUs": true,
 
     "MaxStatelessOperations": 0,
@@ -72,6 +72,70 @@
     "HyStartEnabled": 0,
     "IsSet_HyStartEnabled": true,
 
-    "num_data_streams": 4
+    "MtuDiscoverySearchCompleteTimeoutUs": 600000000,
+    "IsSet_MtuDiscoverySearchCompleteTimeoutUs": false,
+
+    "TlsClientMaxSendBuffer": 4194304,
+    "IsSet_TlsClientMaxSendBuffer": false,
+
+    "TlsServerMaxSendBuffer": 8192,
+    "IsSet_TlsServerMaxSendBuffer": false,
+
+    "SendIdleTimeoutMs": 1000,
+    "IsSet_SendIdleTimeoutMs": false,
+
+    "CongestionControlAlgorithm": 0,
+    "IsSet_CongestionControlAlgorithm": false,
+
+    "MaxBindingStatelessOperations": 100,
+    "IsSet_MaxBindingStatelessOperations": false,
+
+    "StatelessOperationExpirationMs": 100,
+    "IsSet_StatelessOperationExpirationMs": false,
+
+    "MaxOperationsPerDrain": 16,
+    "IsSet_MaxOperationsPerDrain": false,
+
+    "MtuDiscoveryMissingProbeCount": 3,
+    "IsSet_MtuDiscoveryMissingProbeCount": false,
+
+    "DestCidUpdateIdleTimeoutMs": 20000,
+    "IsSet_DestCidUpdateIdleTimeoutMs": false,
+
+    "GreaseQuicBitEnabled": 0,
+    "IsSet_GreaseQuicBitEnabled": false,
+
+    "StreamRecvWindowBidiLocalDefault": 8388608,
+    "IsSet_StreamRecvWindowBidiLocalDefault": true,
+
+    "StreamRecvWindowBidiRemoteDefault": 8388608,
+    "IsSet_StreamRecvWindowBidiRemoteDefault": true,
+
+    "StreamRecvWindowUnidiDefault": 8388608,
+    "IsSet_StreamRecvWindowUnidiDefault": true,
+
+    "EncryptionOffloadAllowed": 0,
+    "IsSet_EncryptionOffloadAllowed": false,
+
+    "ReliableResetEnabled": 0,
+    "IsSet_ReliableResetEnabled": false,
+
+    "OneWayDelayEnabled": 0,
+    "IsSet_OneWayDelayEnabled": false,
+
+    "NetStatsEventEnabled": 0,
+    "IsSet_NetStatsEventEnabled": false,
+
+    "StreamMultiReceiveEnabled": 1,
+    "IsSet_StreamMultiReceiveEnabled": true,
+
+    "XdpEnabled": 1,
+    "IsSet_XdpEnabled": true,
+
+    "QTIPEnabled": 0,
+    "IsSet_QTIPEnabled": false,
+
+    "RioEnabled": 0,
+    "IsSet_RioEnabled": false
   }
 }
