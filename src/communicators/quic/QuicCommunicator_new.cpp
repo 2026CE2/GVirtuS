@@ -1167,26 +1167,27 @@ size_t QuicCommunicator::Write(const char *buffer, size_t size) {
     }
 
     if (size <= MULTISTREAM_THRESHOLD || N == 1) {
-        // Small message or single stream — send as one chunk on the next round-robin stream
-        uint32_t idx = streamRoundRobin.fetch_add(1, std::memory_order_relaxed) % N;
-        SendChunk(dataStreams[idx], msg_id, 1, 0, buffer, size);
+        // Small message — ALWAYS send on stream 0 to preserve in-order delivery.
+        // The gvirtus protocol issues multiple sequential Write() calls per RPC
+        // (routine name, buffer size, buffer data). QUIC only guarantees ordering
+        // within a single stream, so all single-chunk messages must use the same
+        // stream to avoid the backend reading them out of order.
+        SendChunk(dataStreams[0], msg_id, 1, 0, buffer, size);
     } else {
-        // Large message — split evenly across all data streams using round-robin
+        // Large message — split evenly across all data streams starting from stream 0.
+        // The reassembly thread collects all N chunks before writing to outputPipe, so
+        // the assembled payload appears in outputPipe only after all prior single-chunk
+        // messages (sent on stream 0) have already been delivered.
         size_t chunk_size = (size + N - 1) / N;   // ceiling division
 
-        // Count actual chunks (last one may be smaller)
         uint32_t num_chunks = 0;
         for (size_t off = 0; off < size; off += chunk_size)
             ++num_chunks;
 
-        // Pick starting stream for this message via round-robin
-        uint32_t first = streamRoundRobin.fetch_add(1, std::memory_order_relaxed) % N;
-
         uint32_t chunk_idx = 0;
         for (size_t off = 0; off < size; off += chunk_size, ++chunk_idx) {
             size_t cs = std::min(chunk_size, size - off);
-            uint32_t stream_idx = (first + chunk_idx) % N;
-            SendChunk(dataStreams[stream_idx], msg_id, num_chunks, chunk_idx,
+            SendChunk(dataStreams[chunk_idx % N], msg_id, num_chunks, chunk_idx,
                       buffer + off, cs);
         }
     }
