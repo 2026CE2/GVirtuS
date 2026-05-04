@@ -376,12 +376,21 @@ void QuicCommunicator::Connect() {
 
     Status = MsQuic->ConnectionStart(Connection, Configuration, QUIC_ADDRESS_FAMILY_UNSPEC, mHostname.data(), mPort);
     std::cout << "ConnectionStart returned " << Status << std::endl;
+    if (QUIC_FAILED(Status)) {
+        printf("ConnectionStart failed, 0x%x\n", Status);
+        throw std::runtime_error("ConnectionStart failed");
+    }
 
     {
         std::cout << "Waiting for lock event..." << std::endl;
         std::unique_lock<std::mutex> lock(listenerMutex);
         std::cout << "Waiting for connection event..." << std::endl;
         cv.wait(lock, [this] { return connectionEventOcurred; });
+    }
+
+    if (connectionFailed) {
+        printf("QUIC connection failed — server unreachable or rejected the connection\n");
+        throw std::runtime_error("QUIC connection failed");
     }
 
 
@@ -964,11 +973,15 @@ QUIC_STATUS QuicCommunicator::ClientConnectionCallback(HQUIC Connection, void* C
             break;
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
-
             if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status == QUIC_STATUS_CONNECTION_IDLE) {
                 printf("[conn][%p] Successfully shut down on idle.\n", Connection);
             } else {
                 printf("[conn][%p] Shut down by transport, 0x%x\n", Connection, Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
+                // Mark as failed so Connect() can detect this and not hang
+                if (!connectionEventOcurred) {
+                    std::scoped_lock<std::mutex> lock(listenerMutex);
+                    connectionFailed = true;
+                }
             }
             break;
 
@@ -980,6 +993,13 @@ QUIC_STATUS QuicCommunicator::ClientConnectionCallback(HQUIC Connection, void* C
             printf("[conn][%p] All done\n", Connection);
             if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
                 MsQuic->ConnectionClose(Connection);
+            }
+            // If the connection never reached CONNECTED, wake up Connect() so it doesn't hang
+            if (!connectionEventOcurred) {
+                std::scoped_lock<std::mutex> lock(listenerMutex);
+                connectionFailed = true;
+                connectionEventOcurred = true; // unblock the cv.wait predicate
+                cv.notify_one();
             }
             break;
 

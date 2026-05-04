@@ -99,6 +99,7 @@ private:
     mutable std::condition_variable cv;
     mutable std::mutex listenerMutex;
     mutable bool connectionEventOcurred = false;
+    mutable bool connectionFailed = false;
     mutable bool listenerStarted = false;
 
     // Connection objects
