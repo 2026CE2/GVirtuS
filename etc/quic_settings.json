@@ -1,12 +1,12 @@
 {
   "quic_settings": {
-    "IdleTimeoutMs": 1000,
+    "IdleTimeoutMs": 30000,
     "IsSet_IdleTimeoutMs": true,
 
-    "HandshakeIdleTimeoutMs": 500,
+    "HandshakeIdleTimeoutMs": 5000,
     "IsSet_HandshakeIdleTimeoutMs": true,
 
-    "DisconnectTimeoutMs": 1000,
+    "DisconnectTimeoutMs": 10000,
     "IsSet_DisconnectTimeoutMs": true,
 
     "KeepAliveIntervalMs": 0,

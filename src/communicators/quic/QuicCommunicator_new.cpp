@@ -831,6 +831,7 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
             if (isDataStream) {
                 ++numDataStreamsRegistered;
                 dataStreamSet.insert(stream);
+                dataStreams.push_back(stream);  // server-side: populate for Write()
                 streamStarted[stream] = true;
                 if (DefaultStream == nullptr)
                     DefaultStream = stream;
