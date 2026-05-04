@@ -316,6 +316,8 @@ const gvirtus::communicators::Communicator *const QuicCommunicator::Accept() con
     connectionEventOcurred = false;
     std::cout << "New connection accepted and configured, returning communicator..." << std::endl;
     newQuicCommunicator->outputPipe = newQuicCommunicator->InitializePipes();
+    // Start reassembly thread now — don't wait for all streams; streams arrive asynchronously
+    newQuicCommunicator->StartReassemblyThread();
     // TODO: maybe this communicator shoudl be saved to a list of communicators so that in async the server can handle multiple reads
     return newQuicCommunicator; //new 
 }
@@ -403,7 +405,9 @@ void QuicCommunicator::Connect() {
             printf("StreamOpen failed for stream %u, 0x%x!\n", i, Status);
             throw std::runtime_error("StreamOpen failed");
         }
-        if (QUIC_FAILED(Status = MsQuic->StreamStart(stream, QUIC_STREAM_START_FLAG_NONE))) {
+        // IMMEDIATE forces MsQuic to send the stream-open frame right away,
+        // ensuring the server fires PEER_STREAM_STARTED for every stream.
+        if (QUIC_FAILED(Status = MsQuic->StreamStart(stream, QUIC_STREAM_START_FLAG_IMMEDIATE))) {
             printf("StreamStart failed for stream %u, 0x%x!\n", i, Status);
             MsQuic->StreamClose(stream);
             throw std::runtime_error("StreamStart failed");
@@ -845,11 +849,6 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
             MsQuic->SetCallbackHandler(stream, (void *) ServerStreamCallbackWrapper, this);
             multiStreams[stream] = InitializePipes();
             cv.notify_all();
-
-            // Start reassembly thread once all data streams are ready
-            if (numDataStreamsRegistered == numDataStreams && !reassemblyRunning.load()) {
-                StartReassemblyThread();
-            }
         }
         break;
     }
