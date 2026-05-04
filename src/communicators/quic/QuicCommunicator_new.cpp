@@ -99,6 +99,10 @@ bool QuicCommunicator::LoadQuicSettingsFromJson(QUIC_SETTINGS& Settings) {
 
         Settings = cfg.ToQuicSettings();
 
+        // Load our custom multi-stream setting
+        this->numDataStreams = std::max(1u, cfg.num_data_streams);
+        printf("num_data_streams = %u\n", this->numDataStreams);
+
         // =========================
         // VALIDATION
         // =========================
@@ -191,7 +195,8 @@ QuicCommunicator::QuicCommunicator(const QuicCommunicator& other)
       DefaultStream(nullptr),
       Settings(other.Settings),
       mHostname(other.mHostname),
-      mPort(other.mPort)
+      mPort(other.mPort),
+      numDataStreams(other.numDataStreams)
 {
     std::cout << "QuicCommunicator copy constructor called" << std::endl;
 }
@@ -216,12 +221,25 @@ QuicCommunicator::QuicCommunicator(const std::string &communicator) {
 }
 
 QuicCommunicator::~QuicCommunicator() {
-    if (DefaultStream!=NULL)
+    // Stop reassembly thread
+    if (reassemblyRunning.load()) {
+        reassemblyRunning.store(false);
+        if (reassemblyThread.joinable())
+            reassemblyThread.join();
+    }
+    // Close all data streams
+    for (auto& stream : dataStreams) {
+        if (stream != nullptr)
+            MsQuic->StreamClose(stream);
+    }
+    // Fall back to DefaultStream if dataStreams is empty (server-side)
+    if (dataStreams.empty() && DefaultStream != nullptr)
         MsQuic->StreamClose(DefaultStream);
     if (Connection != NULL)
         MsQuic->ConnectionClose(Connection);
-
-    // TODO: This should probably do more stuff
+    // Close output pipe
+    if (outputPipe.read != -1)  close(outputPipe.read);
+    if (outputPipe.write != -1) close(outputPipe.write);
 }
 
 
@@ -297,6 +315,7 @@ const gvirtus::communicators::Communicator *const QuicCommunicator::Accept() con
     receivedConnection = NULL;
     connectionEventOcurred = false;
     std::cout << "New connection accepted and configured, returning communicator..." << std::endl;
+    newQuicCommunicator->outputPipe = newQuicCommunicator->InitializePipes();
     // TODO: maybe this communicator shoudl be saved to a list of communicators so that in async the server can handle multiple reads
     return newQuicCommunicator; //new 
 }
@@ -305,13 +324,24 @@ void QuicCommunicator::Sync() {}
 
 void QuicCommunicator::Close() {
     printf("QuicCommunicator::Close\n");
-    if (DefaultStream!=NULL)
+    // Stop reassembly thread
+    if (reassemblyRunning.load()) {
+        reassemblyRunning.store(false);
+        if (reassemblyThread.joinable())
+            reassemblyThread.join();
+    }
+    // Close data streams
+    for (auto& stream : dataStreams) {
+        if (stream != nullptr)
+            MsQuic->StreamClose(stream);
+    }
+    if (dataStreams.empty() && DefaultStream != nullptr)
         MsQuic->StreamClose(DefaultStream);
     if (Connection != NULL)
         MsQuic->ConnectionClose(Connection);
-
-    // TODO: This should probably do more stuff
-
+    // Close output pipe
+    if (outputPipe.read != -1)  { close(outputPipe.read);  outputPipe.read  = -1; }
+    if (outputPipe.write != -1) { close(outputPipe.write); outputPipe.write = -1; }
 }
 
 // Client
@@ -356,22 +386,31 @@ void QuicCommunicator::Connect() {
 
 
 
-    // Open Default Stream
-    if (QUIC_FAILED(Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE, ClientStreamCallbackWrapper, this, &DefaultStream))) {
-        printf("StreamOpen failed, 0x%x!\n", Status);
-        throw std::runtime_error("StreamOpen failed");
+    // Open numDataStreams streams (round-robin data streams)
+    printf("Opening %u data stream(s)\n", numDataStreams);
+    for (uint32_t i = 0; i < numDataStreams; ++i) {
+        HQUIC stream = nullptr;
+        if (QUIC_FAILED(Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE, ClientStreamCallbackWrapper, this, &stream))) {
+            printf("StreamOpen failed for stream %u, 0x%x!\n", i, Status);
+            throw std::runtime_error("StreamOpen failed");
+        }
+        if (QUIC_FAILED(Status = MsQuic->StreamStart(stream, QUIC_STREAM_START_FLAG_NONE))) {
+            printf("StreamStart failed for stream %u, 0x%x!\n", i, Status);
+            MsQuic->StreamClose(stream);
+            throw std::runtime_error("StreamStart failed");
+        }
+        dataStreams.push_back(stream);
+        dataStreamSet.insert(stream);
+        multiStreams[stream] = InitializePipes();
+        printf("Data stream %u opened: %p\n", i, stream);
     }
+    DefaultStream = dataStreams[0];
 
-    // Start Default Stream
-    if (QUIC_FAILED(Status = MsQuic->StreamStart(DefaultStream, QUIC_STREAM_START_FLAG_NONE))) {
-        printf("StreamStart failed, 0x%x!\n", Status);
-        MsQuic->StreamClose(DefaultStream);
-        throw "StreamStart failed";
-    }
+    // Create the output pipe that Read() reads from
+    outputPipe = InitializePipes();
 
-
-    multiStreams[DefaultStream] = InitializePipes();
-    // TODO: NEED TO LOOK INTO PIPES!!
+    // Start the reassembly thread
+    StartReassemblyThread();
 }
 
 
@@ -558,6 +597,129 @@ bool QuicCommunicator::ClientLoadConfiguration(bool secure) {
 }
 
 // =============================================================================
+// Multi-stream helpers
+// =============================================================================
+
+void QuicCommunicator::SendChunk(HQUIC stream, uint64_t msg_id, uint32_t total_chunks,
+                                  uint32_t chunk_idx, const char* data, size_t data_size) {
+    FrameHeader hdr;
+    hdr.message_id   = msg_id;
+    hdr.total_chunks = total_chunks;
+    hdr.chunk_index  = chunk_idx;
+    hdr.data_size    = static_cast<uint32_t>(data_size);
+
+    size_t total = sizeof(FrameHeader) + data_size;
+    uint8_t* raw = static_cast<uint8_t*>(malloc(sizeof(QUIC_BUFFER) + total));
+    if (raw == nullptr) {
+        printf("SendChunk: malloc failed\n");
+        return;
+    }
+    memcpy(raw + sizeof(QUIC_BUFFER), &hdr, sizeof(FrameHeader));
+    if (data_size > 0)
+        memcpy(raw + sizeof(QUIC_BUFFER) + sizeof(FrameHeader), data, data_size);
+
+    QUIC_BUFFER* qb = reinterpret_cast<QUIC_BUFFER*>(raw);
+    qb->Buffer = raw + sizeof(QUIC_BUFFER);
+    qb->Length = static_cast<uint32_t>(total);
+
+    QUIC_STATUS Status;
+    if (QUIC_FAILED(Status = MsQuic->StreamSend(stream, qb, 1, QUIC_SEND_FLAG_NONE, qb))) {
+        printf("SendChunk: StreamSend failed 0x%x\n", Status);
+        free(raw);
+    }
+}
+
+bool QuicCommunicator::ReadExactFromPipe(int fd, char* buf, size_t size) const {
+    size_t got = 0;
+    while (got < size) {
+        ssize_t r = read(fd, buf + got, size - got);
+        if (r < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                usleep(10);
+                continue;
+            }
+            return false;
+        }
+        if (r == 0) return false;
+        got += static_cast<size_t>(r);
+    }
+    return true;
+}
+
+void QuicCommunicator::StartReassemblyThread() {
+    reassemblyRunning.store(true);
+    reassemblyThread = std::thread([this]() { this->ReassemblyLoop(); });
+}
+
+void QuicCommunicator::ReassemblyLoop() {
+    while (reassemblyRunning.load(std::memory_order_relaxed)) {
+        // Snapshot data-stream read-fds
+        std::vector<int> fds;
+        {
+            std::lock_guard<std::mutex> lock(multiStreamMutex);
+            for (auto& kv : multiStreams) {
+                if (dataStreamSet.count(kv.first))
+                    fds.push_back(kv.second.read);
+            }
+        }
+
+        if (fds.empty()) {
+            usleep(1000);
+            continue;
+        }
+
+        std::vector<struct pollfd> pfds(fds.size());
+        for (size_t i = 0; i < fds.size(); ++i) {
+            pfds[i].fd      = fds[i];
+            pfds[i].events  = POLLIN;
+            pfds[i].revents = 0;
+        }
+
+        int ret = poll(pfds.data(), static_cast<nfds_t>(pfds.size()), 1 /*ms*/);
+        if (ret <= 0) continue;
+
+        for (size_t i = 0; i < pfds.size(); ++i) {
+            if (!(pfds[i].revents & POLLIN)) continue;
+            int fd = pfds[i].fd;
+
+            // Read frame header
+            FrameHeader hdr;
+            if (!ReadExactFromPipe(fd, reinterpret_cast<char*>(&hdr), sizeof(hdr)))
+                continue;
+
+            // Read chunk data
+            std::vector<uint8_t> data(hdr.data_size);
+            if (hdr.data_size > 0 &&
+                !ReadExactFromPipe(fd, reinterpret_cast<char*>(data.data()), hdr.data_size))
+                continue;
+
+            // Accumulate chunk
+            std::lock_guard<std::mutex> lock(pendingMsgMutex);
+            auto& msg = pendingMessages[hdr.message_id];
+            msg.total_chunks = hdr.total_chunks;
+            msg.chunks[hdr.chunk_index] = std::move(data);
+
+            // If all chunks received, write assembled message to outputPipe
+            if (static_cast<uint32_t>(msg.chunks.size()) == msg.total_chunks) {
+                for (uint32_t j = 0; j < msg.total_chunks; ++j) {
+                    const auto& chunk = msg.chunks[j];
+                    if (chunk.empty()) continue;
+                    const char* ptr = reinterpret_cast<const char*>(chunk.data());
+                    size_t left = chunk.size();
+                    while (left > 0) {
+                        ssize_t w = write(outputPipe.write, ptr, left);
+                        if (w <= 0) break;
+                        ptr  += w;
+                        left -= static_cast<size_t>(w);
+                    }
+                }
+                pendingMessages.erase(hdr.message_id);
+            }
+        }
+    }
+}
+
+// =============================================================================
 // Callbacks
 // =============================================================================
 
@@ -648,29 +810,39 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
         break;
         
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-
-        std::cout << "QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED received. Stream: " << Event->PEER_STREAM_STARTED.Stream << std::endl;
-        std::cout << "DefaultStream: " << DefaultStream << std::endl;
+    {
+        HQUIC stream = Event->PEER_STREAM_STARTED.Stream;
+        std::cout << "QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED received. Stream: " << stream << std::endl;
         {
-            std::scoped_lock(multiStreamMutex);
-            if (DefaultStream == nullptr) {
-                DefaultStream = Event->PEER_STREAM_STARTED.Stream;
-                std::cout << "DefaultStream set to: " << DefaultStream << std::endl;
-                streamStarted[DefaultStream] = true;
-            } else {
+            std::scoped_lock<std::mutex> slock(multiStreamMutex);
 
+            // The first numDataStreams peer streams are data streams;
+            // subsequent streams are CUDA/async streams.
+            bool isDataStream = (numDataStreamsRegistered < numDataStreams);
+            if (isDataStream) {
+                ++numDataStreamsRegistered;
+                dataStreamSet.insert(stream);
+                streamStarted[stream] = true;
+                if (DefaultStream == nullptr)
+                    DefaultStream = stream;
+                std::cout << "Registered data stream " << numDataStreamsRegistered
+                          << "/" << numDataStreams << ": " << stream << std::endl;
+            } else {
+                // CUDA stream — first receive event carries the cuda_stream_ptr
+                streamStarted[stream] = false;
             }
-            MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream, (void *) ServerStreamCallbackWrapper, this);
-            {
-                std::scoped_lock(multiStreamMutex);
-                multiStreams[Event->PEER_STREAM_STARTED.Stream] = InitializePipes();
-                
-                // Notify Read that a new stream has been created and is ready to be used
-                cv.notify_all();
+
+            MsQuic->SetCallbackHandler(stream, (void *) ServerStreamCallbackWrapper, this);
+            multiStreams[stream] = InitializePipes();
+            cv.notify_all();
+
+            // Start reassembly thread once all data streams are ready
+            if (numDataStreamsRegistered == numDataStreams && !reassemblyRunning.load()) {
+                StartReassemblyThread();
             }
         }
-
         break;
+    }
 
     default:
         printf("Unkown or unsupported Connection event %i", Event->Type);
@@ -891,42 +1063,30 @@ QUIC_STATUS QuicCommunicator::ClientStreamCallback(HQUIC Stream, void* Context, 
 
 size_t QuicCommunicator::Read(char *buffer, size_t size) {
 
-    // TODO: REVIEW THIS FUNCTION
-    ssize_t ret_value=0;
-    ssize_t size_left=size;
-    if (DefaultStream == nullptr) {
+    ssize_t ret_value = 0;
+    ssize_t size_left = size;
+
+    // Wait until the output pipe has been initialised by Accept()/Connect()
+    if (outputPipe.read == -1) {
         std::unique_lock<std::mutex> lock(listenerMutex);
-        cv.wait(lock, [this] { return multiStreams.find(DefaultStream) != multiStreams.end(); });
-    } 
-    // std::cout << "Pipe for DefaultStream is ready, proceeding with read" << std::endl;
-
-    while(size_left>0) {
-
-        DEBUG_PRINTF("[sid %lu] QuicCommunicator::Read() Block on read() %ld %lu %lu\n", sid, ret_value,size,size_left);
-        ssize_t r = read(multiStreams[DefaultStream].read, buffer+ret_value, size_left);
-
-        if (r < 0) {
-            DEBUG_PRINTF("errno %d\n",errno);
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                //usleep(10);
-                continue;
-            }
-            continue;
-        }
-        
-        if (r < 0 || r==0){
-            ret_value = 0;
-            continue;
-        }
-        else {
-            ret_value += r;
-            size_left=size_left-r;
-            if (size_left == 0)
-                break;
-        }
-        DEBUG_PRINTF("[sid %lu] Read return value: %ld %ld %lu %lu\n",sid ,r,ret_value,size,size_left);
+        cv.wait(lock, [this] { return outputPipe.read != -1; });
     }
 
+    while (size_left > 0) {
+        DEBUG_PRINTF("[sid %lu] QuicCommunicator::Read() Block on read() %ld %lu %lu\n", sid, ret_value, size, size_left);
+        ssize_t r = read(outputPipe.read, buffer + ret_value, size_left);
+
+        if (r < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                continue;
+            continue;
+        }
+        if (r == 0) {
+            continue;
+        }
+        ret_value += r;
+        size_left  -= r;
+    }
 
     return ret_value;
 }
@@ -978,56 +1138,38 @@ size_t QuicCommunicator::Write(const char *buffer, size_t size) {
 
     DEBUG_PRINTF("[sid %lu] %s called with size %lu", sid, __PRETTY_FUNCTION__, size);
 
-    QUIC_STATUS Status;
+    uint64_t msg_id = messageIdCounter.fetch_add(1, std::memory_order_relaxed);
+    uint32_t N = static_cast<uint32_t>(dataStreams.size());
 
-    //
-    // Allocates and builds the buffer to send over the stream.
-    //
-    size_t MAX_BUF_SIZE = 4096*4096*4;
-
-    size_t size_left = size;
-    size_t send_size = 0;
-    size_t send_size_cum = 0;
-
-    DEBUG_PRINTF("[strm][%p] Sending data total... %ld", Stream, size);
-
-    while (size_left>0)
-    {
-        uint8_t* SendBufferRaw;
-        QUIC_BUFFER* SendBuffer;
-        
-        if (size_left > MAX_BUF_SIZE)
-            send_size = MAX_BUF_SIZE;
-        else
-            send_size = size_left;
-        
-        SendBufferRaw = (uint8_t*)malloc(sizeof(QUIC_BUFFER) + send_size);
-        if (SendBufferRaw == NULL) {
-            printf("SendBuffer allocation failed!\n");
-            Status = QUIC_STATUS_OUT_OF_MEMORY;
-        }
-        memcpy(SendBufferRaw+sizeof(QUIC_BUFFER), buffer+send_size_cum, send_size);
-        SendBuffer = (QUIC_BUFFER*)SendBufferRaw;
-        SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
-        SendBuffer->Length = send_size;
-
-        DEBUG_PRINTF("[strm %p] Sending data... %ld %ld\n", Stream, send_size, sizeof(QUIC_BUFFER));
-        send_size_cum += send_size;
-        size_left -= send_size;
-
-
-        //s
-        // Sends the buffer over the stream. Note the FIN flag is passed along with
-        // the buffer. This indicates this is the last buffer on the stream and the
-        // the stream is shut down (in the send direction) immediately after.
-        //
-        if (QUIC_FAILED(Status = MsQuic->StreamSend(DefaultStream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, SendBuffer))) {
-            printf("StreamSend failed, 0x%x!\n", Status);
-            free(SendBufferRaw);
-        }
-        printf("[strm %p] Data sent... %ld %ld\n", DefaultStream, send_size, sizeof(QUIC_BUFFER));
+    if (N == 0) {
+        printf("Write: no data streams open\n");
+        return 0;
     }
-    
+
+    if (size <= MULTISTREAM_THRESHOLD || N == 1) {
+        // Small message or single stream — send as one chunk on the next round-robin stream
+        uint32_t idx = streamRoundRobin.fetch_add(1, std::memory_order_relaxed) % N;
+        SendChunk(dataStreams[idx], msg_id, 1, 0, buffer, size);
+    } else {
+        // Large message — split evenly across all data streams using round-robin
+        size_t chunk_size = (size + N - 1) / N;   // ceiling division
+
+        // Count actual chunks (last one may be smaller)
+        uint32_t num_chunks = 0;
+        for (size_t off = 0; off < size; off += chunk_size)
+            ++num_chunks;
+
+        // Pick starting stream for this message via round-robin
+        uint32_t first = streamRoundRobin.fetch_add(1, std::memory_order_relaxed) % N;
+
+        uint32_t chunk_idx = 0;
+        for (size_t off = 0; off < size; off += chunk_size, ++chunk_idx) {
+            size_t cs = std::min(chunk_size, size - off);
+            uint32_t stream_idx = (first + chunk_idx) % N;
+            SendChunk(dataStreams[stream_idx], msg_id, num_chunks, chunk_idx,
+                      buffer + off, cs);
+        }
+    }
 
     return size;
 }

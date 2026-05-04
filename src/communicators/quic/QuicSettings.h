@@ -101,6 +101,7 @@ struct QuicSettingsConfig {
     uint16_t    MinimumMtu                  = 0;    bool IsSet_MinimumMtu                  = false;
     uint8_t     EcnEnabled                  = 0;    bool IsSet_EcnEnabled                  = false;
     uint8_t     HyStartEnabled              = 0;    bool IsSet_HyStartEnabled              = false;
+    uint32_t    num_data_streams            = 1; // custom: number of parallel data streams
 };
 
 inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
@@ -160,4 +161,5 @@ inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
     get("IsSet_EcnEnabled",             s.IsSet_EcnEnabled);
     get("HyStartEnabled",               s.HyStartEnabled);
     get("IsSet_HyStartEnabled",         s.IsSet_HyStartEnabled);
+    get("num_data_streams",             s.num_data_streams);
 }

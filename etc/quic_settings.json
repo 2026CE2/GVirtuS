@@ -70,6 +70,8 @@
     "IsSet_EcnEnabled": true,
 
     "HyStartEnabled": 0,
-    "IsSet_HyStartEnabled": true
+    "IsSet_HyStartEnabled": true,
+
+    "num_data_streams": 4
   }
 }
