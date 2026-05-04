@@ -92,7 +92,8 @@ gvirtus_install_target(gvirtus-communicators-tcp)
 
 ## Quic COMMUNICATOR
 add_library(gvirtus-communicators-quic SHARED
-    src/communicators/quic/QuicCommunicator_new.cpp PRIVATE QUIC_API_ENABLE_PREVIEW_FEATURES=1)
+    src/communicators/quic/QuicCommunicator_new.cpp)
+target_compile_definitions(gvirtus-communicators-quic PRIVATE QUIC_API_ENABLE_PREVIEW_FEATURES=1)
 target_link_libraries(gvirtus-communicators-quic gvirtus-communicators ${LIBMSQUIC})
 gvirtus_install_target(gvirtus-communicators-quic)
 

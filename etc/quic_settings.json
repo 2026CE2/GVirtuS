@@ -136,6 +136,8 @@
     "IsSet_QTIPEnabled": false,
 
     "RioEnabled": 0,
-    "IsSet_RioEnabled": false
+    "IsSet_RioEnabled": false,
+
+    "num_data_streams": 4
   }
 }
