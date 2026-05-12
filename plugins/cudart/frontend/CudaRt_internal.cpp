@@ -31,6 +31,7 @@
 #include <lz4.h>
 
 #include <cstdio>
+#include <stack>
 
 #include "CudaRt.h"
 
@@ -342,6 +343,14 @@ extern "C" __host__ int __cudaSynchronizeThreads(void **x, void *y) {
     return 0;
 }
 
+// Thread-local stack that preserves the original frontend stream handle across
+// __cudaPushCallConfiguration / __cudaPopCallConfiguration pairs.  The backend
+// remaps device pointers, so the stream value returned by the backend's pop is
+// the backend-side handle, not the frontend-side one.  The compiler-generated
+// device stub passes the popped stream straight to cudaLaunchKernel, which
+// would then look it up in the frontend device-pointer map and fail to find it.
+static thread_local std::stack<cudaStream_t> gCallConfigStreamStack;
+
 extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(dim3 gridDim,
                                                                               dim3 blockDim,
                                                                               size_t sharedMem,
@@ -352,12 +361,14 @@ extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(di
     CudaRtFrontend::AddVariableForArguments(sharedMem);
     CudaRtFrontend::AddDevicePointerForArguments(stream);
 
-    // Route to async execution if stream is non-zero (async), otherwise sync
-    if (stream != nullptr) {
-        CudaRtFrontend::Execute_Async_Wait("cudaPushCallConfiguration", nullptr, stream);
-    } else {
-        CudaRtFrontend::Execute("cudaPushCallConfiguration");
-    }
+    // Save the frontend stream handle so __cudaPopCallConfiguration can return it.
+    gCallConfigStreamStack.push(stream);
+
+    // Must always execute synchronously: CUDA's call-configuration stack is
+    // thread-local on the backend.  If Push were sent to the async worker
+    // thread it would push onto a different thread's stack than the one Pop
+    // runs on, causing Pop to see an empty stack (cudaErrorMissingConfiguration).
+    CudaRtFrontend::Execute("cudaPushCallConfiguration");
     return CudaRtFrontend::GetExitCode();
 }
 
@@ -365,18 +376,18 @@ extern "C" cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim, dim3 
                                                             size_t *sharedMem,
                                                             cudaStream_t *stream) {
     CudaRtFrontend::Prepare();
-
-    // Determine if this is async based on the current stream context
-    // For pop, we need to retrieve data immediately, so we always sync
-    // The async queueing happened in the push
     CudaRtFrontend::Execute("cudaPopCallConfiguration");
-    std::cout << "Popped with stream: " << *stream << std::endl;
 
     *gridDim = CudaRtFrontend::GetOutputVariable<dim3>();
     *blockDim = CudaRtFrontend::GetOutputVariable<dim3>();
     *sharedMem = CudaRtFrontend::GetOutputVariable<size_t>();
-    cudaStream_t stream1 = CudaRtFrontend::GetOutputVariable<cudaStream_t>();
-    std::cout << "Retrieved stream from output variable: " << stream1 << std::endl;
-    memcpy(stream, &stream1, sizeof(cudaStream_t));
+    // Consume the backend stream value from the buffer but discard it: the
+    // backend returns its own (remapped) handle, which is meaningless on the
+    // frontend side.  Use the original frontend handle saved during push.
+    CudaRtFrontend::GetOutputVariable<cudaStream_t>();
+
+    *stream = gCallConfigStreamStack.top();
+    gCallConfigStreamStack.pop();
+
     return CudaRtFrontend::GetExitCode();
 }

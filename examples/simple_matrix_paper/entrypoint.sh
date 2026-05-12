@@ -19,7 +19,7 @@ fi
 cd "${GVIRTUS_HOME}/examples/simple_matrix_paper" || { echo "Failed to enter ${GVIRTUS_HOME}/examples"; exit 1; }
 
 # --- Compile the CUDA program ---
-nvcc simple_matrix.cu -o simple_matrix_app \
+nvcc simple_matrix_async.cu -o simple_matrix_app \
     -L${GVIRTUS_HOME}/lib/frontend \
     -L${GVIRTUS_HOME}/lib/ \
     -lcuda -lcudart -lcublas 

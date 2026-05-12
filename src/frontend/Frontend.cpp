@@ -463,21 +463,25 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
             input_buffer->Dump_Async(frontend->_communicator->obj_ptr().get(), stream);
             send_sec = duration_cast<milliseconds>(steady_clock::now() - start_send).count() / 1000.0;
 
-            frontend->mpOutputBuffer->Reset();
+            // Do NOT touch frontend->mpOutputBuffer here — it is shared with the
+            // main thread's synchronous Execute() path (e.g. cudaPopCallConfiguration
+            // reads dim3 values from it). Calling Reset() from a worker thread races
+            // with the main thread filling and consuming the buffer, causing crashes
+            // at higher stream counts (16+).
             auto start_recv = steady_clock::now();
-            frontend->_communicator->obj_ptr()->Read_Async((char *)&exit_code, sizeof(int), stream);
-            frontend->mExitCode = exit_code;
-            frontend->_communicator->obj_ptr()->Read_Async(reinterpret_cast<char *>(&server_exec_sec),
-                                                          sizeof(server_exec_sec), stream);
-
+            int async_exit_code = 0;
+            double async_server_exec_sec = 0.0;
             size_t out_buffer_size = 0;
+            frontend->_communicator->obj_ptr()->Read_Async((char *)&async_exit_code, sizeof(int), stream);
+            frontend->_communicator->obj_ptr()->Read_Async(reinterpret_cast<char *>(&async_server_exec_sec),
+                                                          sizeof(async_server_exec_sec), stream);
             frontend->_communicator->obj_ptr()->Read_Async((char *)&out_buffer_size, sizeof(size_t), stream);
             frontend->mDataReceived += out_buffer_size;
 
             std::cout << "Received output buffer of size " << out_buffer_size << " bytes\n";
             recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
 
-            frontend->mRoutineExecutionTime += server_exec_sec;
+            frontend->mRoutineExecutionTime += async_server_exec_sec;
             frontend->mSendingTime += send_sec;
             frontend->mReceivingTime += recv_sec;
             job->promise.set_value();
@@ -491,8 +495,15 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
     }
 
     {
+        // Only erase this stream's entry if it still points to OUR context.
+        // If a new stream was created with the same pointer value before this
+        // thread exited, a new context has already been inserted and must not
+        // be removed.
         std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
-        mpAsyncOutputBuffers.erase(stream);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it != mpAsyncOutputBuffers.end() && it->second == context) {
+            mpAsyncOutputBuffers.erase(it);
+        }
     }
 }
 
@@ -525,6 +536,10 @@ void Frontend::Start_Stream(void* stream) {
 
 void Frontend::Stop_Stream(void* stream) {
     if (this->_communicator->obj_ptr()->to_string() == "quiccommunicator") {
+        // Shut down the QUIC stream so the backend's execute_async thread
+        // gets EOF on its pipe read and exits cleanly.
+        this->_communicator->obj_ptr()->Stop_Stream(stream);
+
         std::shared_ptr<AsyncStreamContext> context;
         {
             std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);

@@ -208,7 +208,13 @@ extern "C" __host__ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim,
     // cout << "SharedMem: " << sharedMem << endl;
     // cout << "Stream: " << stream << endl;
 
-    CudaRtFrontend::Execute("cudaLaunchKernel");
+    // Queue the launch on the stream's async worker thread so it is ordered
+    // correctly behind any preceding cudaMemcpyAsync calls on the same stream.
+    if (stream != nullptr) {
+        CudaRtFrontend::Execute_Async("cudaLaunchKernel", nullptr, stream);
+    } else {
+        CudaRtFrontend::Execute("cudaLaunchKernel");
+    }
     free(pArgsPayload);
     return CudaRtFrontend::GetExitCode();
 }

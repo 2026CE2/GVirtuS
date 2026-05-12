@@ -75,6 +75,10 @@ class CudaRtFrontend {
         gvirtus::frontend::Frontend::GetFrontend()->Start_Stream(stream);
     }
 
+    static inline void Stop_Stream(void* stream) {
+        gvirtus::frontend::Frontend::GetFrontend()->Stop_Stream(stream);
+    }
+
     /**
      * Prepares the Frontend for the execution. This method _must_ be called
      * before any requests of execution or any method for adding parameters for
