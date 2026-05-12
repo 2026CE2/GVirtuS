@@ -56,14 +56,13 @@ CUDA_ROUTINE_HANDLER(GraphDestroy) {
 CUDA_ROUTINE_HANDLER(GraphGetNodes) {
     try {
         cudaGraph_t pGraph = input_buffer->Get<cudaGraph_t>();
-        cudaGraphNode_t* nodes = input_buffer->Assign<cudaGraphNode_t>();
-        size_t numNodes;
+        size_t requested = input_buffer->Get<size_t>();
+        cudaGraphNode_t* nodes = (requested > 0) ? input_buffer->Assign<cudaGraphNode_t>(requested) : nullptr;
+        size_t numNodes = requested;
         cudaError_t exit_code = cudaGraphGetNodes(pGraph, nodes, &numNodes);
-        // Debugging output
-        // std::cout << "GraphGetNodes " << nodes << " with a size of "
-        //     << numNodes << std::endl;
         std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
         out->Add<size_t>(numNodes);
+        if (requested > 0) out->Add<cudaGraphNode_t>(nodes, requested);
         return std::make_shared<Result>(exit_code, out);
     } catch (const std::exception& e) {
         cerr << e.what() << endl;
@@ -209,14 +208,17 @@ CUDA_ROUTINE_HANDLER(GraphGetEdges){
 
         size_t requested = input_buffer->Get<size_t>();
 
-        cudaGraphNode_t* from = input_buffer->Assign<cudaGraphNode_t>(requested);
-        cudaGraphNode_t* to = input_buffer->Assign<cudaGraphNode_t>(requested);
+        cudaGraphNode_t* from = (requested > 0) ? input_buffer->Assign<cudaGraphNode_t>(requested) : nullptr;
+        cudaGraphNode_t* to   = (requested > 0) ? input_buffer->Assign<cudaGraphNode_t>(requested) : nullptr;
         size_t numEdges = requested;
         cudaError_t exit_code = cudaGraphGetEdges(graph,from,to,&numEdges);
 
         std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
         out->Add<size_t>(numEdges);
-
+        if (requested > 0) {
+            out->Add<cudaGraphNode_t>(from, requested);
+            out->Add<cudaGraphNode_t>(to,   requested);
+        }
 
         return std::make_shared<Result>(exit_code,out);
     }
@@ -229,11 +231,12 @@ CUDA_ROUTINE_HANDLER(GraphGetEdges){
 }
 
 CUDA_ROUTINE_HANDLER(GraphGetRootNodes){
-    try {cudaGraph_t graph = input_buffer->Get<cudaGraph_t>();
-    
+    try {
+        cudaGraph_t graph = input_buffer->Get<cudaGraph_t>();
+
         size_t requested = input_buffer->Get<size_t>();
 
-        cudaGraphNode_t* pRootNodes = input_buffer->Assign<cudaGraphNode_t>(requested);
+        cudaGraphNode_t* pRootNodes = (requested > 0) ? input_buffer->Assign<cudaGraphNode_t>(requested) : nullptr;
 
         size_t NumRootNodes = requested;
 
@@ -242,10 +245,9 @@ CUDA_ROUTINE_HANDLER(GraphGetRootNodes){
         std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
 
         out->Add<size_t>(NumRootNodes);
+        if (requested > 0) out->Add<cudaGraphNode_t>(pRootNodes, requested);
 
         return std::make_shared<Result>(exit_code,out);
-    
-    
     }
     catch(const std::exception& e){
         cerr << e.what() << endl;

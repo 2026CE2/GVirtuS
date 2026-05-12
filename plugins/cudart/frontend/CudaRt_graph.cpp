@@ -35,12 +35,18 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphGetNodes(cudaGraph_t graph,
                                                             size_t* numNodes) {
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(graph);
-    CudaRtFrontend::AddHostPointerForArguments(nodes);
+    size_t requested = (numNodes ? *numNodes : 0);
+    CudaRtFrontend::AddVariableForArguments(requested);
+    CudaRtFrontend::AddHostPointerForArguments(nodes, requested);
     CudaRtFrontend::Execute("cudaGraphGetNodes");
 
-    if (CudaRtFrontend::Success()) {
+    if (CudaRtFrontend::Success() && numNodes) {
         *numNodes = CudaRtFrontend::GetOutputVariable<size_t>();
-        // cout << "Get a node for graph." << endl;
+        if (requested > 0 && nodes) {
+            cudaGraphNode_t* outNodes =
+                CudaRtFrontend::GetOutputHostPointer<cudaGraphNode_t>(requested);
+            for (size_t i = 0; i < requested; ++i) nodes[i] = outNodes[i];
+        }
     }
     return CudaRtFrontend::GetExitCode();
 }
@@ -208,13 +214,24 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphGetEdges(cudaGraph_t graph, c
     size_t requested = (numEdges ? *numEdges : 0);
     CudaRtFrontend::AddVariableForArguments(requested);
 
-    //output buffers
-    CudaRtFrontend::AddHostPointerForArguments(from,requested);
-    CudaRtFrontend::AddHostPointerForArguments(to,requested);
+    CudaRtFrontend::AddHostPointerForArguments(from, requested);
+    CudaRtFrontend::AddHostPointerForArguments(to,   requested);
 
     CudaRtFrontend::Execute("cudaGraphGetEdges");
     if (CudaRtFrontend::Success() && numEdges){
         *numEdges = CudaRtFrontend::GetOutputVariable<size_t>();
+        if (requested > 0) {
+            if (from) {
+                cudaGraphNode_t* outFrom =
+                    CudaRtFrontend::GetOutputHostPointer<cudaGraphNode_t>(requested);
+                for (size_t i = 0; i < requested; ++i) from[i] = outFrom[i];
+            }
+            if (to) {
+                cudaGraphNode_t* outTo =
+                    CudaRtFrontend::GetOutputHostPointer<cudaGraphNode_t>(requested);
+                for (size_t i = 0; i < requested; ++i) to[i] = outTo[i];
+            }
+        }
     }
     return CudaRtFrontend::GetExitCode();
 
@@ -226,18 +243,19 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphGetRootNodes(cudaGraph_t grap
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(graph);
 
-
     size_t requested = (pNumRootNodes ? *pNumRootNodes : 0);
     CudaRtFrontend::AddVariableForArguments(requested);
     CudaRtFrontend::AddHostPointerForArguments(pRootNodes, requested);
 
     CudaRtFrontend::Execute("cudaGraphGetRootNodes");
 
-    if(CudaRtFrontend::Success() && pNumRootNodes){
+    if (CudaRtFrontend::Success() && pNumRootNodes) {
         *pNumRootNodes = CudaRtFrontend::GetOutputVariable<size_t>();
-
-
-
+        if (requested > 0 && pRootNodes) {
+            cudaGraphNode_t* outNodes =
+                CudaRtFrontend::GetOutputHostPointer<cudaGraphNode_t>(requested);
+            for (size_t i = 0; i < requested; ++i) pRootNodes[i] = outNodes[i];
+        }
     }
     return CudaRtFrontend::GetExitCode();
 }
