@@ -275,10 +275,10 @@ CUDA_ROUTINE_HANDLER(GraphDestroyNode){
 CUDA_ROUTINE_HANDLER(GraphNodeGetType){
     try {
         cudaGraphNode_t node = input_buffer->Get<cudaGraphNode_t>();
-        cudaGraphNodeType_t type;
+        cudaGraphNodeType type;
         cudaError_t exit_code = cudaGraphNodeGetType(node,&type);
         std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
-        out->Add<cudaGraphNodeType_t>(type);
+        out->Add<cudaGraphNodeType>(type);
         return std::make_shared<Result>(exit_code,out);
 
 
@@ -286,21 +286,8 @@ CUDA_ROUTINE_HANDLER(GraphNodeGetType){
         cerr << e.what() << endl;
 
         return std::make_shared<Result>(cudaErrorInvalidValue);
-
-
-
-
-
     }
-
-
-
-
-
-
 }
-
-
 
 CUDA_ROUTINE_HANDLER(GraphNodeFindInClone) {
     try {
@@ -1562,17 +1549,4 @@ CUDA_ROUTINE_HANDLER(GraphConditionalHandleCreate) {
     }
 }
 
-CUDA_ROUTINE_HANDLER(GraphNodeGetDependencies) {
-    try {
-        cudaGraphNode_t node = input_buffer->Get<cudaGraphNode_t>();
-        cudaGraphNode_t *pDependencies = input_buffer->Assign<cudaGraphNode_t>();
-        size_t numDependencies;
-        cudaError_t exit_code = cudaGraphNodeGetDependencies(node, pDependencies, &numDependencies);
-        std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
-        out->Add<size_t>(numDependencies);
-        return std::make_shared<Result>(exit_code, out);
-    } catch (const std::exception& e) {
-        cerr << e.what() << endl;
-        return std::make_shared<Result>(cudaErrorMemoryAllocation);
-    }
-}
+

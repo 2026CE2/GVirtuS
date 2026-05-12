@@ -254,7 +254,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphDestroyNode(cudaGraphNode_t n
 
 }
 
-extern "C" __host__ cudaError_t CUDARTAPI cudaGraphNodeGetType(cudaGraphNode_t node, cudaGraphNodeType_t* pType ){
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphNodeGetType(cudaGraphNode_t node, cudaGraphNodeType* pType ){
     CudaRtFrontend::Prepare();
 
     CudaRtFrontend::AddDevicePointerForArguments(node);
@@ -262,7 +262,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphNodeGetType(cudaGraphNode_t n
     CudaRtFrontend::Execute("cudaGraphNodeGetType");
     if (CudaRtFrontend::Success()){
 
-        *pType = CudaRtFrontend::GetOutputVariable<cudaGraphNodeType_t>();
+        *pType = CudaRtFrontend::GetOutputVariable<cudaGraphNodeType>();
             //could check if pType is null pointer
     }
 
@@ -894,7 +894,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphMemFreeNodeGetParams(
 }
 
 extern "C" __host__ cudaError_t CUDARTAPI cudaGraphNodeSetParams(
-    cudaGraphNode_t node, const cudaGraphNodeParams* nodeParams) {
+    cudaGraphNode_t node, cudaGraphNodeParams* nodeParams) {
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(node);
     CudaRtFrontend::AddHostPointerForArguments(nodeParams);
@@ -1372,16 +1372,4 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphConditionalHandleCreate(
     return CudaRtFrontend::GetExitCode();
 }
 
-extern "C" __host__ cudaError_t CUDARTAPI cudaGraphNodeGetDependencies(cudaGraphNode_t node,
-                                                                       cudaGraphNode_t *pDependencies,
-                                                                       size_t *pNumDependencies) {
-    CudaRtFrontend::Prepare();
-    CudaRtFrontend::AddDevicePointerForArguments(node);
-    CudaRtFrontend::AddHostPointerForArguments(pDependencies);
-    CudaRtFrontend::Execute("cudaGraphNodeGetDependencies");
 
-    if (CudaRtFrontend::Success()) {
-        *pNumDependencies = CudaRtFrontend::GetOutputVariable<size_t>();
-    }
-    return CudaRtFrontend::GetExitCode();
-}
