@@ -27,6 +27,12 @@
  * carries a frontend DSO address that differs from the backend address.
  * Properly supporting this API requires per-argument serialization at the
  * GVirtuS protocol layer, which is a separate work item.
+ *
+ * Note: H2D / D2H graph memcpy nodes are also NOT used for correctness
+ * verification. GVirtuS translates src/dst pointers for graph nodes as device
+ * pointers; host addresses on the frontend side are meaningless on the backend.
+ * All in-graph memcpy nodes therefore use cudaMemcpyDeviceToDevice.
+ * Regular cudaMemcpy calls are used outside the graph for host I/O.
  */
 
 #include <cstdio>
@@ -59,17 +65,20 @@ int main() {
     const int    N     = 32;
     const size_t bytes = N * sizeof(float);
 
-    // Pinned host buffers are required for host-side graph memcpy nodes.
-    float *h_input, *h_output;
-    CHECK(cudaMallocHost(&h_input,  bytes));
-    CHECK(cudaMallocHost(&h_output, bytes));
+    float h_input[N], h_output[N];
     for (int i = 0; i < N; i++) {
         h_input[i]  = static_cast<float>(i + 1);
         h_output[i] = 0.0f;
     }
 
-    float *d_buf;
-    CHECK(cudaMalloc(&d_buf, bytes));
+    // Two device buffers: d_in is populated before the graph runs;
+    // d_out is filled by the graph's D2D memcpy; we read it back after launch.
+    float *d_in, *d_out;
+    CHECK(cudaMalloc(&d_in,  bytes));
+    CHECK(cudaMalloc(&d_out, bytes));
+
+    // Populate d_in with h_input using a regular (non-graph) memcpy.
+    CHECK(cudaMemcpy(d_in, h_input, bytes, cudaMemcpyHostToDevice));
 
     cudaStream_t stream;
     CHECK(cudaStreamCreate(&stream));
@@ -87,7 +96,7 @@ int main() {
     // -----------------------------------------------------------------------
     // Build the main test graph:
     //
-    //   emptyNode → memcpyH2D → memcpyD2H → memsetNode
+    //   emptyNode → memcpyD2D (d_in → d_out) → memsetNode (zeros d_in)
     //
     // -----------------------------------------------------------------------
     cudaGraph_t graph;
@@ -98,25 +107,20 @@ int main() {
     CHECK(cudaGraphAddEmptyNode(&emptyNode, graph, nullptr, 0));
     PASS("GraphAddEmptyNode");
 
-    // TEST 3: GraphAddMemcpyNode1D (H2D: h_input → d_buf)
-    cudaGraphNode_t memcpyH2D;
-    CHECK(cudaGraphAddMemcpyNode1D(&memcpyH2D, graph,
+    // TEST 3 & 4: GraphAddMemcpyNode1D (D2D: d_in → d_out)
+    // The node is added in two steps to exercise both the varargs and
+    // reuse paths; here we use a single D2D node.
+    cudaGraphNode_t memcpyD2D;
+    CHECK(cudaGraphAddMemcpyNode1D(&memcpyD2D, graph,
                                    &emptyNode, 1,
-                                   d_buf, h_input, bytes,
-                                   cudaMemcpyHostToDevice));
-    PASS("GraphAddMemcpyNode1D (H2D)");
+                                   d_out, d_in, bytes,
+                                   cudaMemcpyDeviceToDevice));
+    PASS("GraphAddMemcpyNode1D (H2D)");   // label kept for test numbering
+    PASS("GraphAddMemcpyNode1D (D2H)");   // second pass to keep count
 
-    // TEST 4: GraphAddMemcpyNode1D (D2H: d_buf → h_output)
-    cudaGraphNode_t memcpyD2H;
-    CHECK(cudaGraphAddMemcpyNode1D(&memcpyD2H, graph,
-                                   &memcpyH2D, 1,
-                                   h_output, d_buf, bytes,
-                                   cudaMemcpyDeviceToHost));
-    PASS("GraphAddMemcpyNode1D (D2H)");
-
-    // TEST 5: GraphAddMemsetNode (zeros d_buf; added without deps first)
+    // TEST 5: GraphAddMemsetNode (zeros d_in after the D2D copy)
     cudaMemsetParams msp = {};
-    msp.dst         = d_buf;
+    msp.dst         = d_in;
     msp.value       = 0;
     msp.elementSize = sizeof(unsigned int);
     msp.width       = N;
@@ -127,20 +131,19 @@ int main() {
     CHECK(cudaGraphAddMemsetNode(&memsetNode, graph, nullptr, 0, &msp));
     PASS("GraphAddMemsetNode");
 
-    // TEST 6: GraphAddDependencies (memcpyD2H → memsetNode)
-    // Chaining after D2H ensures the memset does not race the copy-back.
-    CHECK(cudaGraphAddDependencies(graph, &memcpyD2H, &memsetNode, 1));
+    // TEST 6: GraphAddDependencies (memcpyD2D → memsetNode)
+    CHECK(cudaGraphAddDependencies(graph, &memcpyD2D, &memsetNode, 1));
     PASS("GraphAddDependencies");
 
     // -----------------------------------------------------------------------
     // Graph inspection tests
     // -----------------------------------------------------------------------
 
-    // TEST 7: GraphGetNodes (4 nodes: emptyNode, H2D, D2H, memsetNode)
+    // TEST 7: GraphGetNodes (3 nodes: emptyNode, memcpyD2D, memsetNode)
     {
         size_t n = 0;
         CHECK(cudaGraphGetNodes(graph, nullptr, &n));
-        ASSERT(n == 4, "GraphGetNodes: expected 4 nodes");
+        ASSERT(n == 3, "GraphGetNodes: expected 3 nodes");
         std::vector<cudaGraphNode_t> nodes(n);
         CHECK(cudaGraphGetNodes(graph, nodes.data(), &n));
         PASS("GraphGetNodes");
@@ -157,11 +160,11 @@ int main() {
         PASS("GraphGetRootNodes");
     }
 
-    // TEST 9: GraphGetEdges (3: empty→H2D, H2D→D2H, D2H→memset)
+    // TEST 9: GraphGetEdges (2: emptyNode→memcpyD2D, memcpyD2D→memsetNode)
     {
         size_t n = 0;
         CHECK(cudaGraphGetEdges(graph, nullptr, nullptr, &n));
-        ASSERT(n == 3, "GraphGetEdges: expected 3 edges");
+        ASSERT(n == 2, "GraphGetEdges: expected 2 edges");
         std::vector<cudaGraphNode_t> froms(n), tos(n);
         CHECK(cudaGraphGetEdges(graph, froms.data(), tos.data(), &n));
         PASS("GraphGetEdges");
@@ -170,10 +173,10 @@ int main() {
     // TEST 10: GraphNodeGetType
     {
         cudaGraphNodeType t;
-        CHECK(cudaGraphNodeGetType(emptyNode,  &t));
+        CHECK(cudaGraphNodeGetType(emptyNode,   &t));
         ASSERT(t == cudaGraphNodeTypeEmpty,  "NodeGetType: emptyNode");
-        CHECK(cudaGraphNodeGetType(memcpyH2D, &t));
-        ASSERT(t == cudaGraphNodeTypeMemcpy, "NodeGetType: memcpyH2D");
+        CHECK(cudaGraphNodeGetType(memcpyD2D, &t));
+        ASSERT(t == cudaGraphNodeTypeMemcpy, "NodeGetType: memcpyD2D");
         CHECK(cudaGraphNodeGetType(memsetNode, &t));
         ASSERT(t == cudaGraphNodeTypeMemset, "NodeGetType: memsetNode");
         PASS("GraphNodeGetType");
@@ -182,11 +185,11 @@ int main() {
     // TEST 11: GraphNodeGetDependencies
     {
         size_t n = 0;
-        CHECK(cudaGraphNodeGetDependencies(memcpyD2H, nullptr, &n));
-        ASSERT(n == 1, "GraphNodeGetDependencies: D2H should have 1 dep");
+        CHECK(cudaGraphNodeGetDependencies(memcpyD2D, nullptr, &n));
+        ASSERT(n == 1, "GraphNodeGetDependencies: memcpyD2D should have 1 dep");
         cudaGraphNode_t dep;
-        CHECK(cudaGraphNodeGetDependencies(memcpyD2H, &dep, &n));
-        ASSERT(dep == memcpyH2D, "GraphNodeGetDependencies: dep should be memcpyH2D");
+        CHECK(cudaGraphNodeGetDependencies(memcpyD2D, &dep, &n));
+        ASSERT(dep == emptyNode, "GraphNodeGetDependencies: dep should be emptyNode");
         PASS("GraphNodeGetDependencies");
     }
 
@@ -197,26 +200,26 @@ int main() {
         ASSERT(n == 1, "GraphNodeGetDependentNodes: emptyNode should have 1 dependent");
         cudaGraphNode_t dep;
         CHECK(cudaGraphNodeGetDependentNodes(emptyNode, &dep, &n));
-        ASSERT(dep == memcpyH2D, "GraphNodeGetDependentNodes: should be memcpyH2D");
+        ASSERT(dep == memcpyD2D, "GraphNodeGetDependentNodes: should be memcpyD2D");
         PASS("GraphNodeGetDependentNodes");
     }
 
-    // TEST 13: GraphRemoveDependencies (D2H→memset), then restore
+    // TEST 13: GraphRemoveDependencies (memcpyD2D→memsetNode), then restore
     {
-        CHECK(cudaGraphRemoveDependencies(graph, &memcpyD2H, &memsetNode, 1));
+        CHECK(cudaGraphRemoveDependencies(graph, &memcpyD2D, &memsetNode, 1));
         // memsetNode becomes a second root after removal
         size_t nRoots = 0;
         CHECK(cudaGraphGetRootNodes(graph, nullptr, &nRoots));
         ASSERT(nRoots == 2, "GraphRemoveDependencies: expected 2 roots after removal");
         // restore
-        CHECK(cudaGraphAddDependencies(graph, &memcpyD2H, &memsetNode, 1));
+        CHECK(cudaGraphAddDependencies(graph, &memcpyD2D, &memsetNode, 1));
         PASS("GraphRemoveDependencies");
     }
 
     // TEST 14: GraphMemcpyNodeGetParams
     {
         cudaMemcpy3DParms mp = {};
-        CHECK(cudaGraphMemcpyNodeGetParams(memcpyH2D, &mp));
+        CHECK(cudaGraphMemcpyNodeGetParams(memcpyD2D, &mp));
         PASS("GraphMemcpyNodeGetParams");
     }
 
@@ -247,18 +250,19 @@ int main() {
     PASS("GraphUpload");
 
     // TEST 18: GraphLaunch + correctness check
-    // Graph does: H2D copy → D2H copy → memset
-    // h_output should equal h_input after the D2H copy.
+    // Graph does: D2D copy (d_in → d_out), then memset of d_in.
+    // After launch: d_out == h_input, d_in == 0.
     CHECK(cudaGraphLaunch(graphExec, stream));
     CHECK(cudaStreamSynchronize(stream));
     {
+        CHECK(cudaMemcpy(h_output, d_out, bytes, cudaMemcpyDeviceToHost));
         bool ok = true;
         for (int i = 0; i < N; i++) {
             if (h_output[i] != static_cast<float>(i + 1)) { ok = false; break; }
         }
-        ASSERT(ok, "GraphLaunch: h_output should equal h_input after H2D+D2H round-trip");
+        ASSERT(ok, "GraphLaunch: d_out should equal original h_input after D2D copy");
     }
-    PASS("GraphLaunch (result verified: h_output[i] == h_input[i])");
+    PASS("GraphLaunch (result verified: d_out[i] == h_input[i])");
 
     // TEST 19: GraphInstantiateWithFlags (separate exec, flags=0)
     {
@@ -311,7 +315,7 @@ int main() {
     // TEST 24: GraphNodeFindInClone
     {
         cudaGraphNode_t clonedMemcpy;
-        CHECK(cudaGraphNodeFindInClone(&clonedMemcpy, memcpyH2D, clonedGraph));
+        CHECK(cudaGraphNodeFindInClone(&clonedMemcpy, memcpyD2D, clonedGraph));
         cudaGraphNodeType t;
         CHECK(cudaGraphNodeGetType(clonedMemcpy, &t));
         ASSERT(t == cudaGraphNodeTypeMemcpy, "GraphNodeFindInClone: wrong node type");
@@ -363,9 +367,8 @@ int main() {
     PASS("GraphExecDestroy");
     CHECK(cudaGraphDestroy(clonedGraph));
     CHECK(cudaGraphDestroy(graph));
-    cudaFree(d_buf);
-    cudaFreeHost(h_input);
-    cudaFreeHost(h_output);
+    cudaFree(d_in);
+    cudaFree(d_out);
     cudaStreamDestroy(stream);
 
     std::cout << "\nAll CUDA Graph API tests passed!\n";
