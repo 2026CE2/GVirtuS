@@ -782,9 +782,13 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
             //      exits its loop cleanly (no CPU spin, no FD leak).
             //   2. Any subsequent RECEIVE event for this stream returns early
             //      instead of writing to a closed FD.
-            // Do NOT call StreamShutdown here — extra server-side FINs
-            // disrupt QUIC idle detection and cause connection timeouts when
-            // a second benchmark run tries to open new streams.
+            // Then call StreamShutdown(GRACEFUL) so MsQuic fires SHUTDOWN_COMPLETE
+            // → StreamClose, freeing the HQUIC stream object immediately. Without
+            // this, stream objects accumulate inside MsQuic across hundreds of
+            // create/destroy cycles, causing steadily increasing latency.
+            // (The old comment "do not call StreamShutdown" was written before the
+            // Read_Async CPU-spin was fixed; the connection timeout that prompted it
+            // no longer occurs.)
             DEBUG_PRINTF("[strm][%p] Peer shut down\n", Stream);
             {
                 std::scoped_lock<std::mutex> slock(multiStreamMutex);
@@ -800,7 +804,8 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                     }
                     multiStreams.erase(pipeIt);
                 }
-                // Remove cudaStreamMap entry so handle-reuse won't collide.
+                // Remove cudaStreamMap and streamStarted entries.
+                streamStarted.erase(Stream);
                 for (auto it = cudaStreamMap.begin(); it != cudaStreamMap.end(); ) {
                     if (it->second == Stream) {
                         it = cudaStreamMap.erase(it);
@@ -809,6 +814,8 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                     }
                 }
             }
+            // Shut down server send side so QUIC fires SHUTDOWN_COMPLETE.
+            MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
             return QUIC_STATUS_SUCCESS;
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
@@ -1209,8 +1216,24 @@ void QuicCommunicator::Stop_Stream(cuda_stream_ptr stream) {
     auto it = cudaStreamMap.find(stream);
     if (it == cudaStreamMap.end()) return;
     HQUIC hStream = it->second;
-    // Shut down the send side; the server will get PEER_SEND_SHUTDOWN,
-    // close its write pipe, and the execute_async thread will exit via EOF.
+    // Close BOTH ends of the client-side pipe and erase the entry from
+    // multiStreams immediately. This ensures:
+    //   1. Execute_Detached's Read_Async gets EOF (write closed) or EBADF
+    //      (read closed) and exits — no blocked thread leaking FDs.
+    //   2. The read FD is not held open until the connection closes (which
+    //      would cause gradual FD accumulation and increasing d2h latency
+    //      over many stream create/destroy cycles).
+    // Execute_Detached handles r==0 and r<0 (EBADF) with break, so closing
+    // both FDs here while it may be mid-read is safe.
+    {
+        std::scoped_lock<std::mutex> lck(multiStreamMutex);
+        auto pipeIt = multiStreams.find(hStream);
+        if (pipeIt != multiStreams.end()) {
+            if (pipeIt->second.write != -1) close(pipeIt->second.write);
+            if (pipeIt->second.read  != -1) close(pipeIt->second.read);
+            multiStreams.erase(pipeIt);
+        }
+    }
     MsQuic->StreamShutdown(hStream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
     cudaStreamMap.erase(it);
 }
