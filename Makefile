@@ -1,5 +1,19 @@
 .PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test run-simple-matrix-test
 
+# ── Profiling ────────────────────────────────────────────────────────────────
+# Set PROFILE=on to enable per-call CSV profiling (frontend + backend).
+# CSV files land in PROFILE_DIR on the host and are mounted to /profiles inside
+# each container.
+#   make run-openpose-test PROFILE=on
+#   make run-openpose-test PROFILE=on PROFILE_DIR=/data/profiles
+PROFILE     ?= off
+PROFILE_DIR ?= ./profiles
+
+# Flags injected into every docker run / docker exec when PROFILE=on.
+PROFILE_ENV   = -e GVIRTUS_PROFILE=$(PROFILE) -e GVIRTUS_PROFILE_DIR=/profiles
+PROFILE_MOUNT = -v $(abspath $(PROFILE_DIR)):/profiles
+# ---------------------------------------------------------------------------
+
 docker-build-push-prod:
 	docker buildx build \
 		--platform linux/amd64 \
@@ -20,11 +34,14 @@ docker-build-gvirtus:
 # Runs the backend development container.
 # Run docker-build-gvirtus first to build the base image.
 run-gvirtus-backend-dev:
+	@mkdir -p $(PROFILE_DIR)
 	docker run \
 		--rm \
 		-it \
 		--network host \
 		--privileged \
+		$(PROFILE_ENV) \
+		$(PROFILE_MOUNT) \
 		-v ./etc:/opt/GVirtuS/etc/ \
 		-v ./include:/opt/GVirtuS/include \
 		-v ./plugins:/opt/GVirtuS/plugins \
@@ -37,8 +54,11 @@ run-gvirtus-backend-dev:
 		gvirtus:cuda12.6
 
 run-gvirtus-tests:
+	@mkdir -p $(PROFILE_DIR)
 	docker exec \
-		-it gvirtus-backend-dev \
+		-it \
+		$(PROFILE_ENV) \
+		gvirtus-backend-dev \
 		bash -c \
 		'export LD_LIBRARY_PATH=$$GVIRTUS_HOME/lib/frontend:$$LD_LIBRARY_PATH && \
 			cd /gvirtus/build && \
@@ -55,9 +75,12 @@ docker-build-openpose:
 
 # Runs the OpenPose example test.
 run-openpose-test: 
+	@mkdir -p $(PROFILE_DIR)
 	docker run --rm \
 		--name openpose_test_container \
 		--network host \
+		$(PROFILE_ENV) \
+		$(PROFILE_MOUNT) \
 		-v ./include:/opt/GVirtuS/include \
 		-v ./plugins:/opt/GVirtuS/plugins \
 		-v ./src:/opt/GVirtuS/src \
@@ -80,10 +103,13 @@ docker-build-2d-human-parsing:
 
 # Runs the 2D Human Parsing example test.
 run-2d-human-parsing-test: 
+	@mkdir -p $(PROFILE_DIR)
 	docker run --rm \
 		--name human_parsing_test_container \
 		--network host \
 		--shm-size=8G \
+		$(PROFILE_ENV) \
+		$(PROFILE_MOUNT) \
 		-v ./include:/opt/GVirtuS/include \
 		-v ./plugins:/opt/GVirtuS/plugins \
 		-v ./src:/opt/GVirtuS/src \
@@ -97,11 +123,14 @@ run-2d-human-parsing-test:
 
 # Runs the simple matrix example test.
 run-simple-matrix-test:
+	@mkdir -p $(PROFILE_DIR)
 	docker run \
 		--rm \
 		-it \
 		--name simple_matrix_test_container \
 		--network host \
+		$(PROFILE_ENV) \
+		$(PROFILE_MOUNT) \
 		-v ./include:/opt/GVirtuS/include \
 		-v ./plugins:/opt/GVirtuS/plugins \
 		-v ./src:/opt/GVirtuS/src \
@@ -114,11 +143,14 @@ run-simple-matrix-test:
 
 # Simple Matrix example.
 run-simple-matrix-paper-test:
+	@mkdir -p $(PROFILE_DIR)
 	docker run \
 		--rm \
 		-it \
 		--name simple_matrix_test_paper_container \
 		--network host \
+		$(PROFILE_ENV) \
+		$(PROFILE_MOUNT) \
 		-v ./include:/opt/GVirtuS/include \
 		-v ./plugins:/opt/GVirtuS/plugins \
 		-v ./src:/opt/GVirtuS/src \

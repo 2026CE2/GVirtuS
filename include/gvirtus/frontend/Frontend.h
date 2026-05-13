@@ -36,6 +36,7 @@
 #pragma once
 
 #include <gvirtus/common/LD_Lib.h>
+#include <gvirtus/common/Profiler.h>
 #include <gvirtus/communicators/Buffer.h>
 #include <gvirtus/communicators/Communicator.h>
 
@@ -272,5 +273,10 @@ class Frontend {
     double mSendingTime = 0.0;
     double mReceivingTime = 0.0;
     double mRoutineExecutionTime = 0.0;
+
+    /// Per-call profiler — active only when GVIRTUS_PROFILE=on.
+    std::unique_ptr<common::Profiler> mProfiler;
+    /// Monotonic call counter for profiling correlation with the backend.
+    uint64_t mCallSeq = 0;
 };
 }  // namespace gvirtus::frontend
