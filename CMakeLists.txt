@@ -53,7 +53,6 @@ add_library(gvirtus-common SHARED
     src/common/Mutex.cpp
     src/common/Observable.cpp
     src/common/Observer.cpp
-    src/common/Profiler.cpp
     src/common/SignalException.cpp
     src/common/SignalState.cpp
     src/common/Util.cpp

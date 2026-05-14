@@ -143,10 +143,6 @@ void Frontend::Init(Communicator *c) {
     this->mpLaunchBuffer = std::make_shared<Buffer>();
     this->mExitCode = -1;
     this->mpInitialized = true;
-
-    // Initialise the per-thread profiler (no-op when GVIRTUS_PROFILE is unset).
-    this->mProfiler = std::make_unique<gvirtus::common::Profiler>(
-        "frontend", static_cast<pid_t>(getpid()), static_cast<pid_t>(tid));
 }
 
 Frontend::~Frontend() {
@@ -248,10 +244,6 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
                                                         << ", tid=" << tid << "]");
 
     frontend->mRoutinesExecuted++;
-    uint64_t call_seq = ++frontend->mCallSeq;
-
-    // ===== capture total round-trip start time =====
-    auto start_total = steady_clock::now();
 
     // ===== send routine info first（under TCP）=====
     auto start_send = steady_clock::now();
@@ -306,9 +298,6 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
     }
     recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
 
-    double total_sec =
-        duration_cast<milliseconds>(steady_clock::now() - start_total).count() / 1000.0;
-
     // ===== update info =====
     frontend->mRoutineExecutionTime += server_exec_sec;
     frontend->mSendingTime += send_sec;
@@ -324,14 +313,6 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
                                         << " | pid=" << pid << " tid=" << tid);
 
     LOG4CPLUS_DEBUG(logger, "DEBUG - Called: " << routine);
-
-    // ===== record to profiling CSV (no-op when GVIRTUS_PROFILE is unset) =====
-    if (frontend->mProfiler) {
-        frontend->mProfiler->record_frontend(routine, call_seq,
-                                             in_size, out_buffer_size,
-                                             send_sec, server_exec_sec,
-                                             recv_sec, total_sec);
-    }
 
     // ===== stop this call，clean HybridCommunicator status =====
     if (frontend->_communicator->obj_ptr()->to_string() == "hybridcommunicator") {

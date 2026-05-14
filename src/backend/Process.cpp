@@ -30,12 +30,10 @@
 
 #include <gvirtus/backend/Process.h>
 #include <gvirtus/common/JSON.h>
-#include <gvirtus/common/Profiler.h>
 #include <gvirtus/common/SignalException.h>
 #include <gvirtus/common/SignalState.h>
 #include <pthread.h>
 #include <signal.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 
 #include <functional>
@@ -175,19 +173,11 @@ void Process::Start() {
                                             << "Process::Start()'s \"execute\" lambda called");
         // carica i puntatori ai simboli dei moduli in mHandlers
 
-        // Per-connection profiler (no-op when GVIRTUS_PROFILE is unset).
-        gvirtus::common::Profiler profiler(
-            "backend",
-            static_cast<pid_t>(getpid()),
-            static_cast<pid_t>(syscall(SYS_gettid)));
-        uint64_t call_seq = 0;
-
         string routine;
         std::shared_ptr<Buffer> input_buffer = std::make_shared<Buffer>();
 
         while (getstring(client_comm, routine)) {
             LOG4CPLUS_DEBUG(logger, "Received routine " << routine);
-            ++call_seq;
 
             // === before reading buffer, chose the protocol of this round by rountine ===
             gvirtus::communicators::HybridCommunicator *hybrid = nullptr;
@@ -213,7 +203,6 @@ void Process::Start() {
 
             // now reading buffer：8B from TCP, payload will transfer by the selected protocol
             input_buffer->Reset(client_comm);
-            size_t input_size = input_buffer->GetBufferSize();
 
             std::shared_ptr<Handler> h = nullptr;
             for (auto &ptr_el : _handlers) {
@@ -236,12 +225,6 @@ void Process::Start() {
                                       .count() /
                                   1000.0);
             }
-
-            // Record to profiling CSV (no-op when GVIRTUS_PROFILE is unset).
-            profiler.record_backend(routine, call_seq,
-                                    input_size,
-                                    result->GetOutputBuffer()->GetBufferSize(),
-                                    result->TimeTaken());
 
             // return info：control the head transfer by TCP，then payload RDMA
             result->Dump(client_comm);
