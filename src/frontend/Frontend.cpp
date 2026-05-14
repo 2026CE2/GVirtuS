@@ -329,7 +329,7 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
 
 void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, void* stream) {
     if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
-    std::cout << "Execute_Async Called" << std::endl;
+    LOG4CPLUS_DEBUG(logger, "Queued (async) '" << routine << "' | pid=" << getpid() << " tid=" << syscall(SYS_gettid));
     pid_t tid = syscall(SYS_gettid);
     Frontend *frontend = nullptr;
     {
@@ -374,6 +374,7 @@ void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, vo
 
 void Frontend::Execute_Async_Wait(const char *routine, const Buffer *input_buffer, void* stream) {
     if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
+    LOG4CPLUS_DEBUG(logger, "Queued (async-wait) '" << routine << "' | pid=" << getpid() << " tid=" << syscall(SYS_gettid));
 
     pid_t tid = syscall(SYS_gettid);
     Frontend *frontend = nullptr;
@@ -484,6 +485,16 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
             frontend->mRoutineExecutionTime += async_server_exec_sec;
             frontend->mSendingTime += send_sec;
             frontend->mReceivingTime += recv_sec;
+
+            LOG4CPLUS_DEBUG(logger, "Routine '" << routine << "' returned " << async_exit_code
+                                                << " | server_exec=" << async_server_exec_sec << "s"
+                                                << " | send=" << send_sec << "s"
+                                                << " | recv=" << recv_sec << "s"
+                                                << " | in=" << in_size << "B"
+                                                << " | out=" << out_buffer_size << "B"
+                                                << " | pid=" << getpid()
+                                                << " tid=" << syscall(SYS_gettid));
+
             job->promise.set_value();
         } catch (...) {
             try {
