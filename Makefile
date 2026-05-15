@@ -128,3 +128,19 @@ run-simple-matrix-paper-test:
 		-v ./examples/simple_matrix_paper/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
 		gvirtus:cuda12.6 \
 		bash /opt/GVirtuS/entrypoint.sh
+
+# Runs the CUDA Graph API test.
+run-cuda-graph-test:
+	docker run \
+		--rm \
+		-it \
+		--name cuda_graph_test_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/cuda_graph_test/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/cuda_graph_test:/opt/GVirtuS/examples/cuda_graph_test \
+		-v ./examples/cuda_graph_test/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh

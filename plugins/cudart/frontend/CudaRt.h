@@ -27,6 +27,7 @@
 #define _CUDART_H
 
 #include <CudaUtil.h>
+#include <cstdint>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
