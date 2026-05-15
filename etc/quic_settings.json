@@ -36,22 +36,22 @@
     "MigrationEnabled": 0,
     "IsSet_MigrationEnabled": true,
 
-    "DatagramReceiveEnabled": 1,
+    "DatagramReceiveEnabled": 0,
     "IsSet_DatagramReceiveEnabled": true,
 
     "MaxAckDelayMs": 1,
     "IsSet_MaxAckDelayMs": true,
 
-    "StreamRecvWindowDefault": 33554432,
+    "StreamRecvWindowDefault": 8388608,
     "IsSet_StreamRecvWindowDefault": true,
 
-    "StreamRecvBufferDefault": 0,
-    "IsSet_StreamRecvBufferDefault": false,
+    "StreamRecvBufferDefault": 8388608,
+    "IsSet_StreamRecvBufferDefault": true,
 
-    "ConnFlowControlWindow": 67108864,
+    "ConnFlowControlWindow": 16777216,
     "IsSet_ConnFlowControlWindow": true,
 
-    "MaxWorkerQueueDelayUs": 50,
+    "MaxWorkerQueueDelayUs": 500,
     "IsSet_MaxWorkerQueueDelayUs": true,
 
     "MaxStatelessOperations": 0,

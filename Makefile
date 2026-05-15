@@ -65,6 +65,7 @@ run-openpose-test:
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
 		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
 		openpose_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
