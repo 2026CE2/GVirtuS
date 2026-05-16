@@ -45,7 +45,6 @@ CudaRtHandler::CudaRtHandler() {
 
     mapHost2DeviceFunc = new map<const void *, std::string>();
     mapDeviceFunc2InfoFunc = new map<std::string, NvInfoFunction>();
-    mpCallConfigurationStack = new std::deque<CallConfiguration>();
     Initialize();
 }
 
@@ -57,7 +56,6 @@ CudaRtHandler::~CudaRtHandler() {
     delete mpSurface;
     delete mapHost2DeviceFunc;
     delete mapDeviceFunc2InfoFunc;
-    delete mpCallConfigurationStack;
 }
 
 bool CudaRtHandler::CanExecute(std::string routine) {

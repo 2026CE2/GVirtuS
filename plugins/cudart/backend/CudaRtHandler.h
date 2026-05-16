@@ -129,14 +129,22 @@ class CudaRtHandler : public gvirtus::backend::Handler {
         cudaStream_t stream;
     };
 
+    // Thread-local per-stream storage avoids cross-stream config corruption
+    // when 8 Execute_Async threads call Pop+Launch concurrently.
+    static std::deque<CallConfiguration>& GetTlCallConfigStack() {
+        static thread_local std::deque<CallConfiguration> tl_stack;
+        return tl_stack;
+    }
+
     inline void PushSavedCallConfiguration(const CallConfiguration &cfg) {
-        mpCallConfigurationStack->push_back(cfg);
+        GetTlCallConfigStack().push_back(cfg);
     }
 
     inline bool PopSavedCallConfiguration(CallConfiguration &cfg) {
-        if (mpCallConfigurationStack->empty()) return false;
-        cfg = mpCallConfigurationStack->back();
-        mpCallConfigurationStack->pop_back();
+        auto& stack = GetTlCallConfigStack();
+        if (stack.empty()) return false;
+        cfg = stack.back();
+        stack.pop_back();
         return true;
     }
 
@@ -169,7 +177,7 @@ class CudaRtHandler : public gvirtus::backend::Handler {
     std::map<std::string, cudaSurfaceObject_t *> *mpSurface;
     map<std::string, NvInfoFunction> *mapDeviceFunc2InfoFunc;
     map<const void *, std::string> *mapHost2DeviceFunc;
-    std::deque<CallConfiguration> *mpCallConfigurationStack;
+    // mpCallConfigurationStack removed: replaced by per-thread GetTlCallConfigStack()
     void *mpShm;
     int mShmFd;
 };

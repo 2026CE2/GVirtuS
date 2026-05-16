@@ -754,17 +754,9 @@ QuicCommunicator::ClientStreamCallback(
 {
     UNREFERENCED_PARAMETER(Context);
     printf("[TRACE] ClientStreamCallback: Stream=%p Event->Type=%d sid=%lu\n", Stream, Event->Type, sid);
-    int wp = -1;
-    if (QuicCommunicator::pipemap.find(sid) != QuicCommunicator::pipemap.end()) {
-        wp = QuicCommunicator::pipemap[sid];
-        printf("[TRACE] ClientStreamCallback: found pipe wp=%d for sid=%lu\n", wp, sid);
-        DEBUG_PRINTF("Get pipe %lu %d %p %d\n",sid, wp,Stream,Event->Type);
-    }
-    else {
-        printf("[TRACE] ClientStreamCallback: pipe NOT found for sid=%lu, returning early\n", sid);
-        DEBUG_PRINTF("Pipe not found pipe %lu %d %p %d\n",sid, wp,Stream,Event->Type);
-        return QUIC_STATUS_SUCCESS;
-    }
+    // Use this instance's own pipe directly — avoids a data race on the shared
+    // static pipemap when multiple per-CUDA-stream callbacks fire in parallel.
+    int wp = ReadPipeFds[1];
 
     QUIC_BUFFER* qb=NULL;
 

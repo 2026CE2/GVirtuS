@@ -98,10 +98,10 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaStreamCreateWithPriority(cudaStrea
 }
 
 extern "C" __host__ cudaError_t CUDARTAPI cudaStreamSynchronize(cudaStream_t stream) {
+    CudaRtFrontend::Wait_Stream(stream);
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(stream);
     CudaRtFrontend::Execute("cudaStreamSynchronize");
-    CudaRtFrontend::Wait_Stream(stream);
     return CudaRtFrontend::GetExitCode();
 }
 

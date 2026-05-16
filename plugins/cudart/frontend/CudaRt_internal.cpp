@@ -343,7 +343,16 @@ extern "C" __host__ int __cudaSynchronizeThreads(void **x, void *y) {
     return 0;
 }
 
-static thread_local std::stack<void*> streamStack;
+// Per-thread call configuration stack: stores the full config so that
+// __cudaPopCallConfiguration can correctly return gridDim/blockDim/sharedMem
+// without depending on a round-trip to the backend.
+struct CallConfig {
+    dim3 gridDim;
+    dim3 blockDim;
+    size_t sharedMem;
+    cudaStream_t stream;
+};
+static thread_local std::stack<CallConfig> callConfigStack;
 
 extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(dim3 gridDim,
                                                                               dim3 blockDim,
@@ -357,9 +366,8 @@ extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(di
 
     // Route to async execution if stream is non-zero (async), otherwise sync
     if (stream != nullptr) {
-        std::cout << "Pushing with stream: " << stream << "with tid: " << syscall(SYS_gettid) << std::endl;
         CudaRtFrontend::Execute_Async("cudaPushCallConfiguration", nullptr, stream);
-        streamStack.push(stream);
+        callConfigStack.push({gridDim, blockDim, sharedMem, stream});
     } else {
         CudaRtFrontend::Execute("cudaPushCallConfiguration");
     }
@@ -371,33 +379,27 @@ extern "C" cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim, dim3 
                                                             cudaStream_t *stream) {
     CudaRtFrontend::Prepare();
 
-    // Determine if this is async based on the current stream context
-    // For pop, we need to retrieve data immediately, so we always sync
-    // The async queueing happened in the push
-    if (!streamStack.empty()) {
-        std::shared_ptr<Buffer> output_buffer = std::make_shared<Buffer>();
-        auto last_stream = streamStack.top();
-        streamStack.pop();
-        CudaRtFrontend::Execute_Async("cudaPopCallConfiguration", nullptr, last_stream);
-        // *gridDim = output_buffer->Get<dim3>();;
-        // *blockDim = output_buffer->Get<dim3>();
-        // *sharedMem = output_buffer->Get<size_t>();
-        // cudaStream_t stream1 = output_buffer->Get<cudaStream_t>();
-        // std::cout << "Popped with stream: " << stream1 << std::endl;
-        memcpy(stream, &last_stream, sizeof(cudaStream_t));
-        // *stream = (cudaStream_t)last_stream;
+    if (!callConfigStack.empty()) {
+        // Async path: retrieve config from the frontend-side thread-local stack.
+        // This avoids a synchronous backend round-trip and correctly populates
+        // all output parameters (previously gridDim/blockDim/sharedMem were left
+        // uninitialized, causing the kernel to launch with garbage dimensions).
+        CallConfig cfg = callConfigStack.top();
+        callConfigStack.pop();
+        *gridDim  = cfg.gridDim;
+        *blockDim = cfg.blockDim;
+        *sharedMem = cfg.sharedMem;
+        memcpy(stream, &cfg.stream, sizeof(cudaStream_t));
+        CudaRtFrontend::Execute_Async("cudaPopCallConfiguration", nullptr, cfg.stream);
         return cudaSuccess;
 
     } else {
         CudaRtFrontend::Execute("cudaPopCallConfiguration");
-        std::cout << "Popped with stream: " << *stream << std::endl;
-        
         *gridDim = CudaRtFrontend::GetOutputVariable<dim3>();
         *blockDim = CudaRtFrontend::GetOutputVariable<dim3>();
         *sharedMem = CudaRtFrontend::GetOutputVariable<size_t>();
         cudaStream_t stream1 = CudaRtFrontend::GetOutputVariable<cudaStream_t>();
-        std::cout << "Retrieved stream from output variable: " << stream1 << std::endl;
         memcpy(stream, &stream1, sizeof(cudaStream_t));
     }
-        return CudaRtFrontend::GetExitCode();
+    return CudaRtFrontend::GetExitCode();
 }

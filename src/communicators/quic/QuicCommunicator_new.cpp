@@ -717,10 +717,13 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
 
         case QUIC_STREAM_EVENT_RECEIVE:
 
-            if (multiStreams.find(Stream) == multiStreams.end()) {
-                return QUIC_STATUS_NOT_FOUND;
+            {
+                std::scoped_lock<std::mutex> lck(multiStreamMutex);
+                if (multiStreams.find(Stream) == multiStreams.end()) {
+                    return QUIC_STATUS_NOT_FOUND;
+                }
             }
-            
+
             if (streamStarted[Stream] == false) {
                 // std::unique_lock<std::mutex> slock(cudaStreamMapMutex); //TODO : THIS NEEDS TO BE LOCKED BUT WITHOUT CAUSING A DEADLOCK (REVISIT)
                 cuda_stream_ptr ptr;
@@ -756,7 +759,14 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                 return QUIC_STATUS_SUCCESS;
             }
             
-            wp = multiStreams[Stream].write;
+            {
+                std::scoped_lock<std::mutex> lck(multiStreamMutex);
+                auto it = multiStreams.find(Stream);
+                if (it == multiStreams.end()) {
+                    return QUIC_STATUS_NOT_FOUND;
+                }
+                wp = it->second.write;
+            }
             DEBUG_PRINTF("[sid %lu] Get pipe %d for stream %p\n", sid, wp, Stream);
         
 
@@ -815,7 +825,7 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
             MsQuic->StreamClose(Stream);
             
             if (multiStreams.find(Stream) != multiStreams.end()) {
-                std::scoped_lock(multiStreamMutex);
+                std::scoped_lock<std::mutex> lck(multiStreamMutex);
                 if (multiStreams[Stream].write != -1)
                     close(multiStreams[Stream].write);
                 close(multiStreams[Stream].read);
@@ -906,21 +916,20 @@ QUIC_STATUS QuicCommunicator::ClientStreamCallback(HQUIC Stream, void* Context, 
             break;
 
         case QUIC_STREAM_EVENT_RECEIVE:
-            if (multiStreams.find(Stream) == multiStreams.end()) {
-                DEBUG_PRINTF("[sid %lu] Pipe not found for stream %p\n", sid, Stream);
-                return QUIC_STATUS_NOT_FOUND;
-            }
-            else {
-                wp = multiStreams[Stream].write;
+            {
+                std::scoped_lock<std::mutex> lck(multiStreamMutex);
+                auto it = multiStreams.find(Stream);
+                if (it == multiStreams.end()) {
+                    DEBUG_PRINTF("[sid %lu] Pipe not found for stream %p\n", sid, Stream);
+                    return QUIC_STATUS_NOT_FOUND;
+                }
+                wp = it->second.write;
                 DEBUG_PRINTF("[sid %lu] Get pipe %d for stream %p\n", sid, wp, Stream);
             }
-            
+
             for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i) {
-                
                 const QUIC_BUFFER* b = &Event->RECEIVE.Buffers[i];
                 DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data received %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
-                
-                // TODO: May be substituted by non blocking write
                 if (write(wp, b->Buffer, b->Length) == -1) {
                     printf("Failed to write to pipe\n");
                     throw std::runtime_error("Failed to write to pipe");
