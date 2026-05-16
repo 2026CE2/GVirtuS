@@ -2,13 +2,13 @@
   "quic_settings": {
 
     "IdleTimeoutMs": 30000,
-    "IsSet_IdleTimeoutMs": true,
+    "IsSet_IdleTimeoutMs": false,
 
     "HandshakeIdleTimeoutMs": 2000,
-    "IsSet_HandshakeIdleTimeoutMs": true,
+    "IsSet_HandshakeIdleTimeoutMs": false,
 
     "DisconnectTimeoutMs": 10000,
-    "IsSet_DisconnectTimeoutMs": true,
+    "IsSet_DisconnectTimeoutMs": false,
 
     "KeepAliveIntervalMs": 0,
     "IsSet_KeepAliveIntervalMs": false,
@@ -23,67 +23,67 @@
     "IsSet_MaxBytesPerKey": false,
 
     "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
-    "IsSet_ServerResumptionLevel": true,
+    "IsSet_ServerResumptionLevel": false,
 
-    "InitialWindowPackets": 1000,
-    "IsSet_InitialWindowPackets": true,
+    "InitialWindowPackets": 100,
+    "IsSet_InitialWindowPackets": false,
 
     "SendBufferingEnabled": 1,
-    "IsSet_SendBufferingEnabled": true,
+    "IsSet_SendBufferingEnabled": false,
 
     "PacingEnabled": 1,
-    "IsSet_PacingEnabled": true,
+    "IsSet_PacingEnabled": false,
 
     "MigrationEnabled": 0,
-    "IsSet_MigrationEnabled": true,
+    "IsSet_MigrationEnabled": false,
 
     "DatagramReceiveEnabled": 0,
-    "IsSet_DatagramReceiveEnabled": true,
+    "IsSet_DatagramReceiveEnabled": false,
 
     "MaxAckDelayMs": 1,
     "IsSet_MaxAckDelayMs": true,
 
     "StreamRecvWindowDefault": 8388608,
-    "IsSet_StreamRecvWindowDefault": true,
+    "IsSet_StreamRecvWindowDefault": false,
 
     "StreamRecvBufferDefault": 8388608,
-    "IsSet_StreamRecvBufferDefault": true,
+    "IsSet_StreamRecvBufferDefault": false,
 
     "ConnFlowControlWindow": 16777216,
-    "IsSet_ConnFlowControlWindow": true,
+    "IsSet_ConnFlowControlWindow": false,
 
     "MaxWorkerQueueDelayUs": 500,
-    "IsSet_MaxWorkerQueueDelayUs": true,
+    "IsSet_MaxWorkerQueueDelayUs": false,
 
     "MaxStatelessOperations": 0,
     "IsSet_MaxStatelessOperations": false,
 
     "InitialRttMs": 1,
-    "IsSet_InitialRttMs": true,
+    "IsSet_InitialRttMs": false,
 
     "MaximumMtu": 1500,
-    "IsSet_MaximumMtu": true,
+    "IsSet_MaximumMtu": false,
 
     "MinimumMtu": 1500,
-    "IsSet_MinimumMtu": true,
+    "IsSet_MinimumMtu": false,
 
     "EcnEnabled": 1,
-    "IsSet_EcnEnabled": true,
+    "IsSet_EcnEnabled": false,
 
     "HyStartEnabled": 0,
-    "IsSet_HyStartEnabled": true,
+    "IsSet_HyStartEnabled": false,
 
     "MtuDiscoverySearchCompleteTimeoutUs": 600000000,
     "IsSet_MtuDiscoverySearchCompleteTimeoutUs": false,
 
     "TlsClientMaxSendBuffer": 8388608,
-    "IsSet_TlsClientMaxSendBuffer": true,
+    "IsSet_TlsClientMaxSendBuffer": false,
 
     "TlsServerMaxSendBuffer": 8388608,
-    "IsSet_TlsServerMaxSendBuffer": true,
+    "IsSet_TlsServerMaxSendBuffer": false,
 
     "SendIdleTimeoutMs": 0,
-    "IsSet_SendIdleTimeoutMs": true,
+    "IsSet_SendIdleTimeoutMs": false,
 
     "CongestionControlAlgorithm": 0,
     "IsSet_CongestionControlAlgorithm": true,
@@ -95,7 +95,7 @@
     "IsSet_StatelessOperationExpirationMs": false,
 
     "MaxOperationsPerDrain": 64,
-    "IsSet_MaxOperationsPerDrain": true,
+    "IsSet_MaxOperationsPerDrain": false,
 
     "MtuDiscoveryMissingProbeCount": 3,
     "IsSet_MtuDiscoveryMissingProbeCount": false,
@@ -108,16 +108,16 @@
     "IsSet_GreaseQuicBitEnabled": false,
 
     "StreamRecvWindowBidiLocalDefault": 8388608,
-    "IsSet_StreamRecvWindowBidiLocalDefault": true,
+    "IsSet_StreamRecvWindowBidiLocalDefault": false,
 
     "StreamRecvWindowBidiRemoteDefault": 8388608,
-    "IsSet_StreamRecvWindowBidiRemoteDefault": true,
+    "IsSet_StreamRecvWindowBidiRemoteDefault": false,
 
     "StreamRecvWindowUnidiDefault": 8388608,
-    "IsSet_StreamRecvWindowUnidiDefault": true,
+    "IsSet_StreamRecvWindowUnidiDefault": false,
     
     "EncryptionOffloadAllowed": 1,
-    "IsSet_EncryptionOffloadAllowed": true,
+    "IsSet_EncryptionOffloadAllowed": false,
 
     "ReliableResetEnabled": 0,
     "IsSet_ReliableResetEnabled": false,
@@ -129,13 +129,13 @@
     "IsSet_NetStatsEventEnabled": false,
 
     "StreamMultiReceiveEnabled": 1,
-    "IsSet_StreamMultiReceiveEnabled": true,
+    "IsSet_StreamMultiReceiveEnabled": false,
 
     "XdpEnabled": 1,
-    "IsSet_XdpEnabled": true,
+    "IsSet_XdpEnabled": false,
 
     "QTIPEnabled": 1,
-    "IsSet_QTIPEnabled": true,
+    "IsSet_QTIPEnabled": false,
     
     "RioEnabled": 0,
     "IsSet_RioEnabled": false

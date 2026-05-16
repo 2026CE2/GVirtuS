@@ -23,7 +23,7 @@ int main() {
     }
 
     const int warmupRuns = 1;
-    const int numRuns = 100;
+    const int numRuns = 1000;
 
     FILE *csv = fopen("simple_matrix_results.csv", "w");
     fprintf(csv, "run,duration_us,passed\n");
