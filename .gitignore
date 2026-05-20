@@ -120,6 +120,7 @@ diagrams/
 unit_test/include
 unit_test/lib64
 gtest
+*.txt
 
 gvirtus/backend/gvirtus-backend
 
