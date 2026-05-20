@@ -277,9 +277,11 @@ class Frontend {
     struct AsyncStreamContext {
         std::mutex mutex;
         std::condition_variable cv;
+        std::condition_variable done_cv;
         std::queue<std::shared_ptr<AsyncJob>> queue;
         bool stop_requested = false;
         bool active_job = false;
+        bool thread_done = false;
     };
 
     static std::mutex asyncOutputBuffersMutex;

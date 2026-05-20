@@ -25,6 +25,7 @@ run-gvirtus-backend-dev:
 		-it \
 		--network host \
 		--privileged \
+		--ulimit nofile=65536:524288 \
 		-v ./etc:/opt/GVirtuS/etc/ \
 		-v ./include:/opt/GVirtuS/include \
 		-v ./plugins:/opt/GVirtuS/plugins \

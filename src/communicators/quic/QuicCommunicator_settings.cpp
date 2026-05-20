@@ -532,8 +532,7 @@ void gvirtus::communicators::QuicCommunicator::InitializePipes()
             throw "Failed to create pipe";
         }
         int pipe_size = 4096 * 4096 * 4; // 1MB buffer or adjust as needed
-        fcntl(ReadPipeFds[0], F_SETPIPE_SZ, pipe_size);
-        fcntl(ReadPipeFds[1], F_SETPIPE_SZ, pipe_size);
+        fcntl(ReadPipeFds[1], F_SETPIPE_SZ, pipe_size); // set on write end
     }
 
 
@@ -1188,8 +1187,7 @@ void QuicCommunicator::Connect() {
     }
 
     int pipe_size = 4096 * 4096 * 4; // 1MB buffer or adjust as needed
-    fcntl(ReadPipeFds[0], F_SETPIPE_SZ, pipe_size);
-    fcntl(ReadPipeFds[1], F_SETPIPE_SZ, pipe_size);
+    fcntl(ReadPipeFds[1], F_SETPIPE_SZ, pipe_size); // set on write end
 
     DEBUG_PRINTF("Pipe created %lu %d %d %p\n", sid, ReadPipeFds[0], ReadPipeFds[1],Stream);
     DEBUG_PRINTF("Insert pipe %lu %d %p\n", sid, ReadPipeFds[1],Stream);

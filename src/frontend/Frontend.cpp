@@ -177,10 +177,10 @@ Frontend::~Frontend() {
                           << it->second->mDataReceived / (1024 * 1024.0) << " Mb(s) in "
                           << it->second->mReceivingTime << " second(s)\n";
             }
+            it->second->_communicator->obj_ptr()->Close();
             if (it->first != tid) {
                 delete it->second;
             }
-            it->second->_communicator->obj_ptr()->Close();
             it = mpFrontends->erase(it);
         }
 
@@ -592,6 +592,14 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
             mpAsyncOutputBuffers.erase(it);
         }
     }
+
+    // Signal that this thread has fully exited so Stop_Stream can safely
+    // return (and allow the Frontend to be destroyed).
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        context->thread_done = true;
+    }
+    context->done_cv.notify_all();
 }
 
 
@@ -641,6 +649,13 @@ void Frontend::Stop_Stream(void* stream) {
                 context->stop_requested = true;
             }
             context->cv.notify_one();
+
+            // Wait until Execute_Detached has fully exited before returning.
+            // This guarantees the thread no longer holds the raw Frontend*
+            // pointer, so the Frontend object can be safely destroyed after
+            // cudaStreamDestroy returns.
+            std::unique_lock<std::mutex> lk(context->mutex);
+            context->done_cv.wait(lk, [&context] { return context->thread_done; });
         }
     }
 }
