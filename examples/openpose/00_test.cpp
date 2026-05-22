@@ -85,7 +85,9 @@ void printKeypoints(const std::shared_ptr<std::vector<std::shared_ptr<op::Datum>
 }
 
 // Returns {passed, elapsed_seconds}
-std::pair<bool, double> runOnce(int runNum)
+// opWrapper is created once and shared across runs to avoid re-establishing
+// the QUIC connection on every iteration (QUIC does not reconnect cleanly).
+std::pair<bool, double> runOnce(op::Wrapper& opWrapper, int runNum)
 {
     const auto wallStart = std::chrono::steady_clock::now();
     auto elapsed = [&]() {
@@ -96,10 +98,6 @@ std::pair<bool, double> runOnce(int runNum)
     try {
         op::opLog("=== Run " + std::to_string(runNum) + " starting ===",
                   op::Priority::High);
-
-        op::Wrapper opWrapper{op::ThreadManagerMode::Asynchronous};
-        if (FLAGS_disable_multi_thread) opWrapper.disableMultiThreading();
-        opWrapper.start();
 
         const cv::Mat cvImageToProcess = cv::imread(FLAGS_image_path);
         if (cvImageToProcess.empty()) {
@@ -132,15 +130,21 @@ int main(int argc, char* argv[])
 {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-    const int    numRuns = FLAGS_num_runs;
+    const int numRuns = FLAGS_num_runs;
     const std::string csvPath = FLAGS_csv_output;
+
+    // Create and start the wrapper once — keeps the QUIC connection alive
+    // for all runs instead of tearing it down and re-connecting each time.
+    op::Wrapper opWrapper{op::ThreadManagerMode::Asynchronous};
+    if (FLAGS_disable_multi_thread) opWrapper.disableMultiThreading();
+    opWrapper.start();
 
     std::ofstream csv(csvPath);
     csv << "run,elapsed_seconds,result\n";
 
     int passed = 0;
     for (int i = 1; i <= numRuns; ++i) {
-        auto [ok, t] = runOnce(i);
+        auto [ok, t] = runOnce(opWrapper, i);
         csv << i << ","
             << std::fixed << std::setprecision(4) << t << ","
             << (ok ? "PASS" : "FAIL") << "\n";

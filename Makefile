@@ -1,4 +1,4 @@
-.PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test run-simple-matrix-test
+.PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test run-simple-matrix-test run-async-shortkernel-test
 
 docker-build-push-prod:
 	docker buildx build \
@@ -144,5 +144,22 @@ run-cuda-graph-test:
 		-v ./examples/cuda_graph_test/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/cuda_graph_test:/opt/GVirtuS/examples/cuda_graph_test \
 		-v ./examples/cuda_graph_test/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh
+
+# Runs the async shortKernel benchmark (showcases QUIC async pipelining).
+run-async-shortkernel-test:
+	docker run \
+		--rm \
+		-it \
+		--name async_shortkernel_test_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/async_shortkernel_test/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/async_shortkernel_test:/opt/GVirtuS/examples/async_shortkernel_test \
+		-v ./examples/async_shortkernel_test/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
 		gvirtus:cuda12.6 \
 		bash /opt/GVirtuS/entrypoint.sh
