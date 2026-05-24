@@ -125,6 +125,8 @@ TEST(cudaRT, GraphCreateDestroy) {
 __global__ void dummyKernel() {
 }
 
+__global__ void simpleKernel(int* output);
+
 TEST(cudaRT, StreamCaptureInfo) {
     cudaStream_t stream;
     CUDA_CHECK(cudaStreamCreate(&stream));
@@ -184,6 +186,48 @@ TEST(cudaRT, GraphLaunch) {
     CUDA_CHECK(cudaGraphLaunch(graphExec, stream));
     CUDA_CHECK(cudaGraphUpload(graphExec, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
+}
+
+TEST(cudaRT, GraphUploadDoesNotExecuteAndLaunchDoes) {
+    int* d_output = nullptr;
+    int h_output = -1;
+    cudaStream_t stream;
+    cudaGraph_t graph;
+    cudaGraphExec_t graphExec;
+    size_t numNodes = 0;
+
+    CUDA_CHECK(cudaMalloc(&d_output, sizeof(int)));
+    CUDA_CHECK(cudaMemset(d_output, 0, sizeof(int)));
+    CUDA_CHECK(cudaStreamCreate(&stream));
+
+    CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal));
+    simpleKernel<<<1, 1, 0, stream>>>(d_output);
+    CUDA_CHECK(cudaStreamEndCapture(stream, &graph));
+
+    CUDA_CHECK(cudaGraphGetNodes(graph, nullptr, &numNodes));
+    ASSERT_EQ(numNodes, 1);
+
+    CUDA_CHECK(cudaGraphInstantiateWithFlags(&graphExec, graph, 0));
+    CUDA_CHECK(cudaGraphDestroy(graph));
+
+    CUDA_CHECK(cudaMemcpy(&h_output, d_output, sizeof(int), cudaMemcpyDeviceToHost));
+    ASSERT_EQ(h_output, 0);
+
+    CUDA_CHECK(cudaGraphUpload(graphExec, stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+
+    CUDA_CHECK(cudaMemcpy(&h_output, d_output, sizeof(int), cudaMemcpyDeviceToHost));
+    ASSERT_EQ(h_output, 0);
+
+    CUDA_CHECK(cudaGraphLaunch(graphExec, stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+
+    CUDA_CHECK(cudaMemcpy(&h_output, d_output, sizeof(int), cudaMemcpyDeviceToHost));
+    ASSERT_EQ(h_output, 123);
+
+    CUDA_CHECK(cudaGraphExecDestroy(graphExec));
+    CUDA_CHECK(cudaStreamDestroy(stream));
+    CUDA_CHECK(cudaFree(d_output));
 }
 
 TEST(cudaRT, GetDevice) {

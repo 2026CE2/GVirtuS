@@ -1,4 +1,4 @@
-.PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test run-simple-matrix-test
+.PHONY: docker-build-push-prod docker-build-gvirtus docker-build-gvirtus-pytorch run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test docker-build-pytorch-cuda-graphs run-pytorch-cuda-graphs-test run-pytorch-import-smoke-test run-simple-matrix-test
 
 docker-build-push-prod:
 	docker buildx build \
@@ -16,6 +16,15 @@ docker-build-gvirtus:
 		-f docker/dev/Dockerfile \
 		-t gvirtus:cuda12.6 \
 		.
+
+# Builds a reusable PyTorch-on-GVirtuS base image so examples do not reinstall
+# Python and torch on every rebuild.
+docker-build-gvirtus-pytorch: docker-build-gvirtus
+	docker buildx build \
+		--platform linux/amd64 \
+		-f examples/pytorch-cuda-graphs/Dockerfile.base \
+		-t gvirtus-pytorch:cuda12.6 \
+		examples/pytorch-cuda-graphs
 
 # Runs the backend development container.
 # Run docker-build-gvirtus first to build the base image.
@@ -94,6 +103,50 @@ run-2d-human-parsing-test:
 		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/2d-human-parsing/entrypoint.sh:/entrypoint.sh \
 		human-parsing_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+# Builds the PyTorch CUDA Graphs example.
+# Run docker-build-gvirtus-pytorch first to build the cached PyTorch base.
+docker-build-pytorch-cuda-graphs: docker-build-gvirtus-pytorch
+	docker buildx build \
+		--platform linux/amd64 \
+		-f examples/pytorch-cuda-graphs/Dockerfile \
+		-t pytorch-cuda-graphs_gvirtus:cuda12.6 \
+		examples/pytorch-cuda-graphs
+
+# Runs the PyTorch CUDA Graphs example test.
+run-pytorch-cuda-graphs-test:
+	docker run --rm \
+		--name pytorch_cuda_graphs_test_container \
+		--network host \
+		--shm-size=8G \
+		-e PYTORCH_CUDA_GRAPHS_BATCH_SIZE \
+		-e PYTORCH_CUDA_GRAPHS_BENCHMARK_ITERS \
+		-e PYTORCH_CUDA_GRAPHS_OUTPUT_JSON \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/pytorch-cuda-graphs:/opt/GVirtuS/examples/pytorch-cuda-graphs \
+		-v ./examples/pytorch-cuda-graphs/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/pytorch-cuda-graphs/entrypoint.sh:/entrypoint.sh \
+		pytorch-cuda-graphs_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+run-pytorch-import-smoke-test:
+	docker run --rm \
+		--name pytorch_import_smoke_test_container \
+		--network host \
+		--shm-size=8G \
+		-e PYTORCH_CUDA_GRAPHS_MODE=import-smoke \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/pytorch-cuda-graphs:/opt/GVirtuS/examples/pytorch-cuda-graphs \
+		-v ./examples/pytorch-cuda-graphs/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/pytorch-cuda-graphs/entrypoint.sh:/entrypoint.sh \
+		pytorch-cuda-graphs_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
 # Runs the simple matrix example test.

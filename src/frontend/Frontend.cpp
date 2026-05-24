@@ -152,6 +152,8 @@ Frontend::~Frontend() {
     if (destroying || mpFrontends == nullptr) return;
     destroying = true;
 
+    std::cerr << "[GVIRTUS_FRONTEND] ~Frontend begin this=" << this
+              << " map=" << mpFrontends << std::endl;
     std::lock_guard<std::mutex> lock(gFrontendMutex);
     {
         pid_t tid = syscall(SYS_gettid);
@@ -163,6 +165,8 @@ Frontend::~Frontend() {
         // Safe iteration while erasing entries
         for (auto it = mpFrontends->begin(); it != mpFrontends->end(); /* no increment here */) {
             if (it->second == this) {
+                std::cerr << "[GVIRTUS_FRONTEND] removing self entry tid=" << it->first
+                          << " frontend=" << it->second << std::endl;
                 it = mpFrontends->erase(it);
                 continue;
             }
@@ -177,17 +181,30 @@ Frontend::~Frontend() {
                           << it->second->mDataReceived / (1024 * 1024.0) << " Mb(s) in "
                           << it->second->mReceivingTime << " second(s)\n";
             }
-            if (it->first != tid) {
-                delete it->second;
+            Frontend *frontend = it->second;
+            auto communicator = frontend ? frontend->_communicator : nullptr;
+
+            if (communicator) {
+                std::cerr << "[GVIRTUS_FRONTEND] closing communicator tid=" << it->first
+                          << " frontend=" << frontend
+                          << " type=" << communicator->obj_ptr()->to_string() << std::endl;
+                communicator->obj_ptr()->Close();
             }
-            it->second->_communicator->obj_ptr()->Close();
+
+            if (it->first != tid) {
+                std::cerr << "[GVIRTUS_FRONTEND] deleting frontend tid=" << it->first
+                          << " frontend=" << frontend << std::endl;
+                delete frontend;
+            }
             it = mpFrontends->erase(it);
         }
 
         // Delete the map itself and set pointer to nullptr
+        std::cerr << "[GVIRTUS_FRONTEND] deleting frontend map" << std::endl;
         delete mpFrontends;
         mpFrontends = nullptr;
     }
+    std::cerr << "[GVIRTUS_FRONTEND] ~Frontend end this=" << this << std::endl;
 }
 
 Frontend *Frontend::GetFrontend(Communicator *c) {

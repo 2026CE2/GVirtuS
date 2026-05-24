@@ -216,17 +216,37 @@ QuicCommunicator::QuicCommunicator(const std::string &communicator) {
 }
 
 QuicCommunicator::~QuicCommunicator() {
-    if (DefaultStream!=NULL)
-        MsQuic->StreamClose(DefaultStream);
-        
-    for (auto& pair : cudaStreamMap) {
-        MsQuic->StreamClose(pair.second);
-        cudaStreamMap.erase(pair.first);
-    }
-    if (Connection != NULL)
-        MsQuic->ConnectionClose(Connection);
+    std::cerr << "[GVIRTUS_QUIC] ~QuicCommunicator begin this=" << this
+              << " DefaultStream=" << DefaultStream
+              << " Connection=" << Connection
+              << " stream_count=" << cudaStreamMap.size() << std::endl;
 
-    // TODO: This should probably do more stuff
+    if (MsQuic != nullptr && DefaultStream != NULL) {
+        std::cerr << "[GVIRTUS_QUIC] closing DefaultStream in destructor handle="
+                  << DefaultStream << std::endl;
+        MsQuic->StreamClose(DefaultStream);
+        DefaultStream = NULL;
+    }
+
+    if (MsQuic != nullptr) {
+        for (const auto &pair : cudaStreamMap) {
+            if (pair.second != NULL) {
+                std::cerr << "[GVIRTUS_QUIC] closing cuda stream in destructor key="
+                          << pair.first << " handle=" << pair.second << std::endl;
+                MsQuic->StreamClose(pair.second);
+            }
+        }
+        cudaStreamMap.clear();
+    }
+
+    if (MsQuic != nullptr && Connection != NULL) {
+        std::cerr << "[GVIRTUS_QUIC] closing Connection in destructor handle="
+                  << Connection << std::endl;
+        MsQuic->ConnectionClose(Connection);
+        Connection = NULL;
+    }
+
+    std::cerr << "[GVIRTUS_QUIC] ~QuicCommunicator end this=" << this << std::endl;
 }
 
 
@@ -310,12 +330,37 @@ void QuicCommunicator::Sync() {}
 
 void QuicCommunicator::Close() {
     printf("QuicCommunicator::Close\n");
-    if (DefaultStream!=NULL)
-        MsQuic->StreamClose(DefaultStream);
-    if (Connection != NULL)
-        MsQuic->ConnectionClose(Connection);
+    std::cerr << "[GVIRTUS_QUIC] Close begin this=" << this
+              << " DefaultStream=" << DefaultStream
+              << " Connection=" << Connection
+              << " stream_count=" << cudaStreamMap.size() << std::endl;
 
-    // TODO: This should probably do more stuff
+    if (MsQuic != nullptr && DefaultStream != NULL) {
+        std::cerr << "[GVIRTUS_QUIC] closing DefaultStream in Close handle="
+                  << DefaultStream << std::endl;
+        MsQuic->StreamClose(DefaultStream);
+        DefaultStream = NULL;
+    }
+
+    if (MsQuic != nullptr) {
+        for (const auto &pair : cudaStreamMap) {
+            if (pair.second != NULL) {
+                std::cerr << "[GVIRTUS_QUIC] closing cuda stream in Close key="
+                          << pair.first << " handle=" << pair.second << std::endl;
+                MsQuic->StreamClose(pair.second);
+            }
+        }
+        cudaStreamMap.clear();
+    }
+
+    if (MsQuic != nullptr && Connection != NULL) {
+        std::cerr << "[GVIRTUS_QUIC] closing Connection in Close handle="
+                  << Connection << std::endl;
+        MsQuic->ConnectionClose(Connection);
+        Connection = NULL;
+    }
+
+    std::cerr << "[GVIRTUS_QUIC] Close end this=" << this << std::endl;
 
 }
 

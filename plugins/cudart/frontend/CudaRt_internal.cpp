@@ -262,9 +262,14 @@ extern "C" __host__ void **__cudaRegisterFatBinaryEnd(void *fatCubin) {
 }
 
 extern "C" __host__ void __cudaUnregisterFatBinary(void **fatCubinHandle) {
+    std::cerr << "[GVIRTUS_CUDART] __cudaUnregisterFatBinary begin handle="
+              << fatCubinHandle << std::endl;
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddStringForArguments(CudaUtil::MarshalHostPointer(fatCubinHandle));
     CudaRtFrontend::Execute("cudaUnregisterFatBinary");
+    std::cerr << "[GVIRTUS_CUDART] __cudaUnregisterFatBinary end handle="
+              << fatCubinHandle
+              << " exit_code=" << CudaRtFrontend::GetExitCode() << std::endl;
 }
 
 extern "C" __host__ void __cudaRegisterFunction(void **fatCubinHandle, const char *hostFun,
