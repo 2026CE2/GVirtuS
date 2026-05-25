@@ -152,6 +152,8 @@ Frontend::~Frontend() {
     if (destroying || mpFrontends == nullptr) return;
     destroying = true;
 
+    std::cerr << "[GVIRTUS_FRONTEND] ~Frontend begin this=" << this
+              << " map=" << mpFrontends << std::endl;
     std::lock_guard<std::mutex> lock(gFrontendMutex);
     {
         pid_t tid = syscall(SYS_gettid);
@@ -163,6 +165,8 @@ Frontend::~Frontend() {
         // Safe iteration while erasing entries
         for (auto it = mpFrontends->begin(); it != mpFrontends->end(); /* no increment here */) {
             if (it->second == this) {
+                std::cerr << "[GVIRTUS_FRONTEND] removing self entry tid=" << it->first
+                          << " frontend=" << it->second << std::endl;
                 it = mpFrontends->erase(it);
                 continue;
             }
@@ -185,9 +189,11 @@ Frontend::~Frontend() {
         }
 
         // Delete the map itself and set pointer to nullptr
+        std::cerr << "[GVIRTUS_FRONTEND] deleting frontend map" << std::endl;
         delete mpFrontends;
         mpFrontends = nullptr;
     }
+    std::cerr << "[GVIRTUS_FRONTEND] ~Frontend end this=" << this << std::endl;
 }
 
 Frontend *Frontend::GetFrontend(Communicator *c) {
