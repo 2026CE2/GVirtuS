@@ -6,6 +6,8 @@ set -e
 
 OPENPOSE_ROOT=/opt/openpose
 IMAGE="${OPENPOSE_IMAGE:-openpose_gvirtus:cuda12.6}"
+# Lower resolution = less VRAM. Override with e.g.: NET_RESOLUTION=368x-1 make run-openpose-native-test
+NET_RESOLUTION="${NET_RESOLUTION:-256x-1}"
 
 # Real CUDA + OpenPose libs only — GVirtuS frontend intentionally excluded.
 NATIVE_LD_PATH="\
@@ -22,6 +24,7 @@ docker run --rm \
   --name openpose_native_test \
   --runtime=nvidia \
   -e LD_LIBRARY_PATH="${NATIVE_LD_PATH}" \
+  -e NET_RESOLUTION="${NET_RESOLUTION}" \
   -v "$(pwd)/examples/openpose/00_test.cpp:${OPENPOSE_ROOT}/examples/gvirtus/00_test.cpp:ro" \
   -v "$(pwd)/examples/openpose/media:${OPENPOSE_ROOT}/examples/media:rw" \
   "${IMAGE}" \
@@ -48,5 +51,6 @@ docker run --rm \
     /tmp/00_test_native \
         --image_path=\${OPENPOSE_ROOT}/examples/media/COCO_val2014_000000000589.jpg \
         --output_dir=\${OPENPOSE_ROOT}/examples/media \
-        --csv_output=\${OPENPOSE_ROOT}/examples/media/results_native.csv
+        --csv_output=\${OPENPOSE_ROOT}/examples/media/results_native.csv \
+        --net_resolution="\${NET_RESOLUTION:-256x-1}"
   "
