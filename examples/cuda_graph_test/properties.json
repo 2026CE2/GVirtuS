@@ -9,7 +9,15 @@
       },
       "plugins": [
         "cuda",
-        "cudart"
+        "cudart",
+        "cublas",
+        "curand",
+        "cudnn",
+        "cufft",
+        "cusolver",
+        "cusparse",
+        "nvrtc",
+        "nvml"
       ]
     }
   ],
