@@ -21,6 +21,9 @@ DEFINE_bool(no_display, true, "Disable visual display.");
 DEFINE_int32(num_runs, 10, "Number of times to run the test.");
 DEFINE_string(csv_output, "/opt/openpose/examples/media/results.csv",
               "Path for the CSV results file.");
+DEFINE_string(net_resolution, "368x-1",
+              "OpenPose network input resolution (WxH, -1 scales proportionally). "
+              "Reduce to lower GPU memory usage (e.g. 368x-1 vs default 656x368).");
 
 static std::string deriveOutputPath(const std::string& inputPath,
                                     const std::string& outDir,
