@@ -181,20 +181,9 @@ Frontend::~Frontend() {
                           << it->second->mDataReceived / (1024 * 1024.0) << " Mb(s) in "
                           << it->second->mReceivingTime << " second(s)\n";
             }
-            Frontend *frontend = it->second;
-            auto communicator = frontend ? frontend->_communicator : nullptr;
-
-            if (communicator) {
-                std::cerr << "[GVIRTUS_FRONTEND] closing communicator tid=" << it->first
-                          << " frontend=" << frontend
-                          << " type=" << communicator->obj_ptr()->to_string() << std::endl;
-                communicator->obj_ptr()->Close();
-            }
-
+            it->second->_communicator->obj_ptr()->Close();
             if (it->first != tid) {
-                std::cerr << "[GVIRTUS_FRONTEND] deleting frontend tid=" << it->first
-                          << " frontend=" << frontend << std::endl;
-                delete frontend;
+                delete it->second;
             }
             it = mpFrontends->erase(it);
         }
@@ -609,6 +598,14 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
             mpAsyncOutputBuffers.erase(it);
         }
     }
+
+    // Signal that this thread has fully exited so Stop_Stream can safely
+    // return (and allow the Frontend to be destroyed).
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        context->thread_done = true;
+    }
+    context->done_cv.notify_all();
 }
 
 
@@ -658,6 +655,13 @@ void Frontend::Stop_Stream(void* stream) {
                 context->stop_requested = true;
             }
             context->cv.notify_one();
+
+            // Wait until Execute_Detached has fully exited before returning.
+            // This guarantees the thread no longer holds the raw Frontend*
+            // pointer, so the Frontend object can be safely destroyed after
+            // cudaStreamDestroy returns.
+            std::unique_lock<std::mutex> lk(context->mutex);
+            context->done_cv.wait(lk, [&context] { return context->thread_done; });
         }
     }
 }

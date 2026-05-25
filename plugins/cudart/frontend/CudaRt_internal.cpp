@@ -369,8 +369,10 @@ extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(di
     CudaRtFrontend::AddVariableForArguments(sharedMem);
     CudaRtFrontend::AddDevicePointerForArguments(stream);
 
-    // Route to async execution if stream is non-zero (async), otherwise sync
-    if (stream != nullptr) {
+    // Route to async execution only if the stream is registered with the QUIC
+    // communicator. Unregistered non-null streams (e.g. cuBLAS-internal streams)
+    // fall back to the synchronous path, matching cudaLaunchKernel's behaviour.
+    if (stream != nullptr && CudaRtFrontend::findStream(stream)) {
         CudaRtFrontend::Execute_Async("cudaPushCallConfiguration", nullptr, stream);
         callConfigStack.push({gridDim, blockDim, sharedMem, stream});
     } else {
@@ -395,7 +397,14 @@ extern "C" cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim, dim3 
         *blockDim = cfg.blockDim;
         *sharedMem = cfg.sharedMem;
         memcpy(stream, &cfg.stream, sizeof(cudaStream_t));
-        CudaRtFrontend::Execute_Async("cudaPopCallConfiguration", nullptr, cfg.stream);
+        // Use async only if the stream is registered; otherwise sync.
+        // The output values are already populated from the cache above,
+        // so we discard whatever the backend echoes back in the sync case.
+        if (CudaRtFrontend::findStream(cfg.stream)) {
+            CudaRtFrontend::Execute_Async("cudaPopCallConfiguration", nullptr, cfg.stream);
+        } else {
+            CudaRtFrontend::Execute("cudaPopCallConfiguration");
+        }
         return cudaSuccess;
 
     } else {

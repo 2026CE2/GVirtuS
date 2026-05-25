@@ -569,7 +569,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemcpyAsync(void *dst, const void 
             CudaRtFrontend::AddVariableForArguments(kind);
             CudaRtFrontend::AddDevicePointerForArguments(stream);
 
-            if (stream != nullptr) {
+            if (stream != nullptr && CudaRtFrontend::findStream(stream)) {
                 CudaRtFrontend::Execute_Async("cudaMemcpyAsync", nullptr, (void *) stream);
                 return cudaSuccess;
             } else {
@@ -586,7 +586,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemcpyAsync(void *dst, const void 
             CudaRtFrontend::AddDevicePointerForArguments(stream);
             // return immediately and copy output back when the async callback fires
 
-            if (stream != nullptr) {
+            if (stream != nullptr && CudaRtFrontend::findStream(stream)) {
                 CudaRtFrontend::Execute_Async("cudaMemcpyAsync", nullptr, stream,
                     [dst, count]() {
                         if (CudaRtFrontend::Success()) {
@@ -606,7 +606,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemcpyAsync(void *dst, const void 
             CudaRtFrontend::AddVariableForArguments(count);
             CudaRtFrontend::AddVariableForArguments(kind);
             CudaRtFrontend::AddDevicePointerForArguments(stream);
-            if (stream != nullptr) {
+            if (stream != nullptr && CudaRtFrontend::findStream(stream)) {
                 CudaRtFrontend::Execute_Async("cudaMemcpyAsync", nullptr, (void *) stream);
                 return cudaSuccess;
             } else {

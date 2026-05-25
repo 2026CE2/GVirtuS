@@ -1,5 +1,7 @@
 #include <stdexcept>
 #include <iostream>
+#include <cerrno>
+#include <cstring>
 #include <fcntl.h>
 #include <gvirtus/communicators/Endpoint_Quic.h>
 #include "QuicCommunicator_new.h"
@@ -216,37 +218,29 @@ QuicCommunicator::QuicCommunicator(const std::string &communicator) {
 }
 
 QuicCommunicator::~QuicCommunicator() {
-    std::cerr << "[GVIRTUS_QUIC] ~QuicCommunicator begin this=" << this
-              << " DefaultStream=" << DefaultStream
-              << " Connection=" << Connection
-              << " stream_count=" << cudaStreamMap.size() << std::endl;
-
-    if (MsQuic != nullptr && DefaultStream != NULL) {
-        std::cerr << "[GVIRTUS_QUIC] closing DefaultStream in destructor handle="
-                  << DefaultStream << std::endl;
-        MsQuic->StreamClose(DefaultStream);
-        DefaultStream = NULL;
-    }
-
-    if (MsQuic != nullptr) {
-        for (const auto &pair : cudaStreamMap) {
-            if (pair.second != NULL) {
-                std::cerr << "[GVIRTUS_QUIC] closing cuda stream in destructor key="
-                          << pair.first << " handle=" << pair.second << std::endl;
-                MsQuic->StreamClose(pair.second);
-            }
+    // Close pipes for all remaining streams (unblocks any blocked reads).
+    {
+        std::scoped_lock<std::mutex> lck(multiStreamMutex);
+        for (auto& kv : multiStreams) {
+            if (kv.second.write != -1) close(kv.second.write);
+            if (kv.second.read  != -1) close(kv.second.read);
         }
-        cudaStreamMap.clear();
+        multiStreams.clear();
     }
 
-    if (MsQuic != nullptr && Connection != NULL) {
-        std::cerr << "[GVIRTUS_QUIC] closing Connection in destructor handle="
-                  << Connection << std::endl;
+    // Shut down any QUIC streams that were not already Stop_Stream'd.
+    // Iterate a copy to avoid invalidating iterators via callbacks.
+    for (auto& [ptr, hquic] : cudaStreamMap) {
+        if (hquic != nullptr)
+            MsQuic->StreamShutdown(hquic, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+    }
+    cudaStreamMap.clear();
+
+    if (DefaultStream != nullptr)
+        MsQuic->StreamShutdown(DefaultStream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+
+    if (Connection != NULL)
         MsQuic->ConnectionClose(Connection);
-        Connection = NULL;
-    }
-
-    std::cerr << "[GVIRTUS_QUIC] ~QuicCommunicator end this=" << this << std::endl;
 }
 
 
@@ -330,38 +324,26 @@ void QuicCommunicator::Sync() {}
 
 void QuicCommunicator::Close() {
     printf("QuicCommunicator::Close\n");
-    std::cerr << "[GVIRTUS_QUIC] Close begin this=" << this
-              << " DefaultStream=" << DefaultStream
-              << " Connection=" << Connection
-              << " stream_count=" << cudaStreamMap.size() << std::endl;
-
-    if (MsQuic != nullptr && DefaultStream != NULL) {
-        std::cerr << "[GVIRTUS_QUIC] closing DefaultStream in Close handle="
-                  << DefaultStream << std::endl;
-        MsQuic->StreamClose(DefaultStream);
-        DefaultStream = NULL;
-    }
-
-    if (MsQuic != nullptr) {
-        for (const auto &pair : cudaStreamMap) {
-            if (pair.second != NULL) {
-                std::cerr << "[GVIRTUS_QUIC] closing cuda stream in Close key="
-                          << pair.first << " handle=" << pair.second << std::endl;
-                MsQuic->StreamClose(pair.second);
-            }
+    // Close pipes first so any blocked Read_Async calls unblock.
+    {
+        std::scoped_lock<std::mutex> lck(multiStreamMutex);
+        for (auto& kv : multiStreams) {
+            if (kv.second.write != -1) close(kv.second.write);
+            if (kv.second.read  != -1) close(kv.second.read);
         }
-        cudaStreamMap.clear();
+        multiStreams.clear();
     }
+    // Null stream handles BEFORE ConnectionClose so the SHUTDOWN_COMPLETE
+    // callbacks (which fire synchronously inside ConnectionClose) find them
+    // already null and skip StreamClose, avoiding double-free.
+    // ConnectionClose will free all stream resources internally.
+    DefaultStream = nullptr;
+    cudaStreamMap.clear();
 
-    if (MsQuic != nullptr && Connection != NULL) {
-        std::cerr << "[GVIRTUS_QUIC] closing Connection in Close handle="
-                  << Connection << std::endl;
+    if (Connection != NULL) {
         MsQuic->ConnectionClose(Connection);
         Connection = NULL;
     }
-
-    std::cerr << "[GVIRTUS_QUIC] Close end this=" << this << std::endl;
-
 }
 
 // Client
@@ -450,14 +432,13 @@ void QuicCommunicator::InitializeQuic() {
 Pipes gvirtus::communicators::QuicCommunicator::InitializePipes() {
     int pipes[2];
     if (pipe(pipes) == -1) {
-        printf("Failed to create pipe\n");
-        throw std::runtime_error("Failed to create pipe");
+        printf("Failed to create pipe: %s\n", strerror(errno));
+        throw std::runtime_error(std::string("Failed to create pipe: ") + strerror(errno));
     }
     Pipes fdPipes {pipes[0], pipes[1]};
 
     int pipe_size = 4096 * 4096 * 4; // ~64MB buffer
     fcntl(fdPipes.read, F_SETPIPE_SZ, pipe_size);
-    fcntl(fdPipes.write, F_SETPIPE_SZ, pipe_size);
 
     return fdPipes;
 }
@@ -781,15 +762,22 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                     i++;
                 }
                 // If a previous stream was mapped to this CUDA stream pointer
-                // (handle reuse after cudaStreamDestroy), close its write pipe
-                // end so the old execute_async thread gets EOF and exits.
+                // (handle reuse after cudaStreamDestroy), close BOTH pipe ends
+                // so the old execute_async thread gets EOF and the FDs are freed.
                 auto oldIt = cudaStreamMap.find(ptr);
                 if (oldIt != cudaStreamMap.end()) {
                     HQUIC oldHquic = oldIt->second;
                     auto pipeIt = multiStreams.find(oldHquic);
-                    if (pipeIt != multiStreams.end() && pipeIt->second.write != -1) {
-                        close(pipeIt->second.write);
-                        pipeIt->second.write = -1;
+                    if (pipeIt != multiStreams.end()) {
+                        if (pipeIt->second.write != -1) {
+                            close(pipeIt->second.write);
+                            pipeIt->second.write = -1;
+                        }
+                        if (pipeIt->second.read != -1) {
+                            close(pipeIt->second.read);
+                            pipeIt->second.read = -1;
+                        }
+                        multiStreams.erase(pipeIt);
                     }
                     streamStarted.erase(oldHquic);
                     cudaStreamMap.erase(oldIt);
@@ -1002,8 +990,12 @@ QUIC_STATUS QuicCommunicator::ClientStreamCallback(HQUIC Stream, void* Context, 
                 auto it = multiStreams.find(Stream);
                 if (it != multiStreams.end()) {
                     if (it->second.write != -1) close(it->second.write);
-                    close(it->second.read);
+                    if (it->second.read  != -1) close(it->second.read);
                     multiStreams.erase(it);
+                }
+                // Null the DefaultStream pointer so Write() doesn't use a freed handle.
+                if (Stream == DefaultStream) {
+                    DefaultStream = nullptr;
                 }
             }
             break;
@@ -1107,6 +1099,11 @@ size_t QuicCommunicator::Read_Async(char *buffer, size_t size, cuda_stream_ptr s
 size_t QuicCommunicator::Write(const char *buffer, size_t size) {
 
     DEBUG_PRINTF("[sid %lu] %s called with size %lu", sid, __PRETTY_FUNCTION__, size);
+
+    if (DefaultStream == nullptr) {
+        printf("Write() called with null DefaultStream — connection was lost\n");
+        return 0;
+    }
 
     QUIC_STATUS Status;
 
