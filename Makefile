@@ -131,6 +131,8 @@ run-pytorch-cuda-graphs-test:
 		-e PYTORCH_CUDA_GRAPHS_BATCH_SIZE \
 		-e PYTORCH_CUDA_GRAPHS_BENCHMARK_ITERS \
 		-e PYTORCH_CUDA_GRAPHS_OUTPUT_JSON \
+		-e PYTORCH_CUDA_GRAPHS_OUTPUT_CSV \
+		-e PYTORCH_CUDA_GRAPHS_NUM_RUNS \
 		-v ./include:/opt/GVirtuS/include \
 		-v ./plugins:/opt/GVirtuS/plugins \
 		-v ./src:/opt/GVirtuS/src \

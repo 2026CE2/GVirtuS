@@ -18,8 +18,11 @@ fi
 
 mkdir -p "${GVIRTUS_HOME}/examples/pytorch-cuda-graphs/results"
 OUTPUT_JSON="${PYTORCH_CUDA_GRAPHS_OUTPUT_JSON:-${GVIRTUS_HOME}/examples/pytorch-cuda-graphs/results/benchmark-summary.json}"
+OUTPUT_CSV="${PYTORCH_CUDA_GRAPHS_OUTPUT_CSV:-${GVIRTUS_HOME}/examples/pytorch-cuda-graphs/pytorch_cuda_graphs_results.csv}"
 
+PYTORCH_CUDA_GRAPHS_OUTPUT_CSV="${OUTPUT_CSV}" \
 ./run.sh --batch-size "${PYTORCH_CUDA_GRAPHS_BATCH_SIZE:-128}" \
   --benchmark-iters "${PYTORCH_CUDA_GRAPHS_BENCHMARK_ITERS:-10}" \
+  --num-runs "${PYTORCH_CUDA_GRAPHS_NUM_RUNS:-50}" \
   --output-json "${OUTPUT_JSON}" \
   "$@"

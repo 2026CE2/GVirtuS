@@ -17,4 +17,7 @@ PYTHONFAULTHANDLER=1 \
 CUDA_LAUNCH_BLOCKING="${CUDA_LAUNCH_BLOCKING:-1}" \
 TORCH_SHOW_CPP_STACKTRACES=1 \
 TORCH_DISABLE_ADDR2LINE=1 \
-python3 benchmark.py "$@"
+python3 benchmark.py \
+  --output-csv "${PYTORCH_CUDA_GRAPHS_OUTPUT_CSV:-${GVIRTUS_HOME}/examples/pytorch-cuda-graphs/pytorch_cuda_graphs_results.csv}" \
+  --num-runs "${PYTORCH_CUDA_GRAPHS_NUM_RUNS:-1}" \
+  "$@"
