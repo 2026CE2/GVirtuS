@@ -6,9 +6,9 @@
 #include <iomanip>
 #include <sstream>
 
-#define OPENPOSE_FLAGS_DISABLE_POSE
 #include <openpose/flags.hpp>
 #include <openpose/headers.hpp>
+#include <openpose/utilities/flagsToOpenPose.hpp>
 
 // Defaults point to the bind-mounted folder inside the container
 DEFINE_string(image_path, "/opt/openpose/examples/media/COCO_val2014_000000000589.jpg",
@@ -21,9 +21,6 @@ DEFINE_bool(no_display, true, "Disable visual display.");
 DEFINE_int32(num_runs, 10, "Number of times to run the test.");
 DEFINE_string(csv_output, "/opt/openpose/examples/media/results.csv",
               "Path for the CSV results file.");
-DEFINE_string(net_resolution, "368x-1",
-              "OpenPose network input resolution (WxH, -1 scales proportionally). "
-              "Reduce to lower GPU memory usage (e.g. 368x-1 vs default 656x368).");
 
 static std::string deriveOutputPath(const std::string& inputPath,
                                     const std::string& outDir,
@@ -140,6 +137,20 @@ int main(int argc, char* argv[])
     // for all runs instead of tearing it down and re-connecting each time.
     op::Wrapper opWrapper{op::ThreadManagerMode::Asynchronous};
     if (FLAGS_disable_multi_thread) opWrapper.disableMultiThreading();
+
+    op::WrapperStructPose wrapperStructPose{};
+    wrapperStructPose.netInputSize = op::flagsToPoint(op::String(FLAGS_net_resolution), "-1x368");
+    wrapperStructPose.netInputSizeDynamicBehavior = FLAGS_net_resolution_dynamic;
+    wrapperStructPose.gpuNumber = FLAGS_num_gpu;
+    wrapperStructPose.gpuNumberStart = FLAGS_num_gpu_start;
+    wrapperStructPose.scalesNumber = FLAGS_scale_number;
+    wrapperStructPose.scaleGap = static_cast<float>(FLAGS_scale_gap);
+    wrapperStructPose.renderMode = op::flagsToRenderMode(FLAGS_render_pose);
+    wrapperStructPose.poseModel = op::flagsToPoseModel(op::String(FLAGS_model_pose));
+    wrapperStructPose.modelFolder = op::String(FLAGS_model_folder);
+    wrapperStructPose.numberPeopleMax = FLAGS_number_people_max;
+    opWrapper.configure(wrapperStructPose);
+
     opWrapper.start();
 
     std::ofstream csv(csvPath);
