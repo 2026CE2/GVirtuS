@@ -225,6 +225,22 @@ run-async-shortkernel-test:
 		-v ./examples/async_shortkernel_test/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
 		gvirtus:cuda12.6 \
 		bash /opt/GVirtuS/entrypoint.sh
+
+# Runs the async shortKernel test natively (direct GPU, no GVirtuS interception) for baseline performance.
+run-async-shortkernel-native-test:
+	docker run \
+		--rm \
+		-it \
+		--name async_shortkernel_native_test_container \
+		--runtime=nvidia \
+		-v ./examples/async_shortkernel_test:/opt/GVirtuS/examples/async_shortkernel_test \
+		gvirtus:cuda12.6 \
+		bash -c '\
+			cd /opt/GVirtuS/examples/async_shortkernel_test && \
+			nvcc async_shortkernel_test.cu -o async_shortkernel_test_native && \
+			./async_shortkernel_test_native \
+		'
+
 # Runs the CUDA Graph test natively (direct GPU, no GVirtuS interception) for baseline performance.
 
 run-cuda-graph-native-test:
