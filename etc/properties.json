@@ -2,9 +2,9 @@
     "communicator": [
         {
             "endpoint": {
-                "suite": "tcp/ip",
-                "protocol": "tcp",
-                "server_address": "24.24.24.1",
+                "suite": "quic/ip",
+                "protocol": "quic",
+                "server_address": "127.0.0.1",
                 "port": "2222"
             },
             "plugins": [
@@ -21,5 +21,5 @@
             ]
         }
     ],
-    "secure_application": false
+    "secure_application": true
 }

@@ -33,6 +33,7 @@
 #include <cstdio>
 
 #include "CudaRt.h"
+#include <stack>
 
 // Helper: allocate and copy section headers table
 Elf64_Shdr *copySectionHeaders(const Elf64_Ehdr *eh) {
@@ -255,14 +256,20 @@ extern "C" __host__ void **__cudaRegisterFatBinaryEnd(void *fatCubin) {
 
     CudaRtFrontend::Prepare();
     CudaRtFrontend::Execute("cudaRegisterFatBinaryEnd", input_buffer);
+    delete input_buffer;
     if (CudaRtFrontend::Success()) return (void **)fatCubin;
     return NULL;
 }
 
 extern "C" __host__ void __cudaUnregisterFatBinary(void **fatCubinHandle) {
+    std::cerr << "[GVIRTUS_CUDART] __cudaUnregisterFatBinary begin handle="
+              << fatCubinHandle << std::endl;
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddStringForArguments(CudaUtil::MarshalHostPointer(fatCubinHandle));
     CudaRtFrontend::Execute("cudaUnregisterFatBinary");
+    std::cerr << "[GVIRTUS_CUDART] __cudaUnregisterFatBinary end handle="
+              << fatCubinHandle
+              << " exit_code=" << CudaRtFrontend::GetExitCode() << std::endl;
 }
 
 extern "C" __host__ void __cudaRegisterFunction(void **fatCubinHandle, const char *hostFun,
@@ -341,6 +348,17 @@ extern "C" __host__ int __cudaSynchronizeThreads(void **x, void *y) {
     return 0;
 }
 
+// Per-thread call configuration stack: stores the full config so that
+// __cudaPopCallConfiguration can correctly return gridDim/blockDim/sharedMem
+// without depending on a round-trip to the backend.
+struct CallConfig {
+    dim3 gridDim;
+    dim3 blockDim;
+    size_t sharedMem;
+    cudaStream_t stream;
+};
+static thread_local std::stack<CallConfig> callConfigStack;
+
 extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(dim3 gridDim,
                                                                               dim3 blockDim,
                                                                               size_t sharedMem,
@@ -351,8 +369,15 @@ extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(di
     CudaRtFrontend::AddVariableForArguments(sharedMem);
     CudaRtFrontend::AddDevicePointerForArguments(stream);
 
-    CudaRtFrontend::Execute("cudaPushCallConfiguration");
-
+    // Route to async execution only if the stream is registered with the QUIC
+    // communicator. Unregistered non-null streams (e.g. cuBLAS-internal streams)
+    // fall back to the synchronous path, matching cudaLaunchKernel's behaviour.
+    if (stream != nullptr && CudaRtFrontend::findStream(stream)) {
+        CudaRtFrontend::Execute_Async("cudaPushCallConfiguration", nullptr, stream);
+        callConfigStack.push({gridDim, blockDim, sharedMem, stream});
+    } else {
+        CudaRtFrontend::Execute("cudaPushCallConfiguration");
+    }
     return CudaRtFrontend::GetExitCode();
 }
 
@@ -361,13 +386,34 @@ extern "C" cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim, dim3 
                                                             cudaStream_t *stream) {
     CudaRtFrontend::Prepare();
 
-    CudaRtFrontend::Execute("cudaPopCallConfiguration");
+    if (!callConfigStack.empty()) {
+        // Async path: retrieve config from the frontend-side thread-local stack.
+        // This avoids a synchronous backend round-trip and correctly populates
+        // all output parameters (previously gridDim/blockDim/sharedMem were left
+        // uninitialized, causing the kernel to launch with garbage dimensions).
+        CallConfig cfg = callConfigStack.top();
+        callConfigStack.pop();
+        *gridDim  = cfg.gridDim;
+        *blockDim = cfg.blockDim;
+        *sharedMem = cfg.sharedMem;
+        memcpy(stream, &cfg.stream, sizeof(cudaStream_t));
+        // Use async only if the stream is registered; otherwise sync.
+        // The output values are already populated from the cache above,
+        // so we discard whatever the backend echoes back in the sync case.
+        if (CudaRtFrontend::findStream(cfg.stream)) {
+            CudaRtFrontend::Execute_Async("cudaPopCallConfiguration", nullptr, cfg.stream);
+        } else {
+            CudaRtFrontend::Execute("cudaPopCallConfiguration");
+        }
+        return cudaSuccess;
 
-    *gridDim = CudaRtFrontend::GetOutputVariable<dim3>();
-    *blockDim = CudaRtFrontend::GetOutputVariable<dim3>();
-    *sharedMem = CudaRtFrontend::GetOutputVariable<size_t>();
-    cudaStream_t stream1 = CudaRtFrontend::GetOutputVariable<cudaStream_t>();
-
-    memcpy(stream, &stream1, sizeof(cudaStream_t));
+    } else {
+        CudaRtFrontend::Execute("cudaPopCallConfiguration");
+        *gridDim = CudaRtFrontend::GetOutputVariable<dim3>();
+        *blockDim = CudaRtFrontend::GetOutputVariable<dim3>();
+        *sharedMem = CudaRtFrontend::GetOutputVariable<size_t>();
+        cudaStream_t stream1 = CudaRtFrontend::GetOutputVariable<cudaStream_t>();
+        memcpy(stream, &stream1, sizeof(cudaStream_t));
+    }
     return CudaRtFrontend::GetExitCode();
 }

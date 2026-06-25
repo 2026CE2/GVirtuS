@@ -43,7 +43,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <iostream>
 #include <map>
 #include <string>
@@ -120,6 +122,32 @@ class CudaRtHandler : public gvirtus::backend::Handler {
         return mapHost2DeviceFunc->find(hostFunc)->second;
     };
 
+    struct CallConfiguration {
+        dim3 gridDim;
+        dim3 blockDim;
+        size_t sharedMem;
+        cudaStream_t stream;
+    };
+
+    // Thread-local per-stream storage avoids cross-stream config corruption
+    // when 8 Execute_Async threads call Pop+Launch concurrently.
+    static std::deque<CallConfiguration>& GetTlCallConfigStack() {
+        static thread_local std::deque<CallConfiguration> tl_stack;
+        return tl_stack;
+    }
+
+    inline void PushSavedCallConfiguration(const CallConfiguration &cfg) {
+        GetTlCallConfigStack().push_back(cfg);
+    }
+
+    inline bool PopSavedCallConfiguration(CallConfiguration &cfg) {
+        auto& stack = GetTlCallConfigStack();
+        if (stack.empty()) return false;
+        cfg = stack.back();
+        stack.pop_back();
+        return true;
+    }
+
     static void hexdump(void *ptr, int buflen) {
         unsigned char *buf = (unsigned char *)ptr;
         int i, j;
@@ -149,6 +177,7 @@ class CudaRtHandler : public gvirtus::backend::Handler {
     std::map<std::string, cudaSurfaceObject_t *> *mpSurface;
     map<std::string, NvInfoFunction> *mapDeviceFunc2InfoFunc;
     map<const void *, std::string> *mapHost2DeviceFunc;
+    // mpCallConfigurationStack removed: replaced by per-thread GetTlCallConfigStack()
     void *mpShm;
     int mShmFd;
 };
@@ -202,6 +231,7 @@ CUDA_ROUTINE_HANDLER(FuncGetAttributes);
 CUDA_ROUTINE_HANDLER(FuncSetCacheConfig);
 CUDA_ROUTINE_HANDLER(Launch);
 CUDA_ROUTINE_HANDLER(LaunchKernel);
+CUDA_ROUTINE_HANDLER(LaunchCooperativeKernel);
 CUDA_ROUTINE_HANDLER(SetDoubleForDevice);
 CUDA_ROUTINE_HANDLER(SetDoubleForHost);
 CUDA_ROUTINE_HANDLER(SetupArgument);
@@ -287,6 +317,7 @@ CUDA_ROUTINE_HANDLER(GraphInstantiate);
 CUDA_ROUTINE_HANDLER(GraphInstantiateWithFlags);
 CUDA_ROUTINE_HANDLER(GraphExecDestroy);
 CUDA_ROUTINE_HANDLER(GraphUpload);
+CUDA_ROUTINE_HANDLER(GraphNodeGetDependencies);
 
 /* CudaRtHandler_version */
 CUDA_ROUTINE_HANDLER(DriverGetVersion);
@@ -299,4 +330,91 @@ CUDA_ROUTINE_HANDLER(OccupancyMaxActiveBlocksPerMultiprocessorWithFlags);
 /* CudaRtHandler_api */
 CUDA_ROUTINE_HANDLER(FuncSetAttribute);
 
+/* Cuda Graph Extensions*/
+CUDA_ROUTINE_HANDLER(GraphClone);
+CUDA_ROUTINE_HANDLER(GraphAddDependencies);
+CUDA_ROUTINE_HANDLER(GraphRemoveDependencies);
+CUDA_ROUTINE_HANDLER(GraphGetEdges);
+CUDA_ROUTINE_HANDLER(GraphGetRootNodes);
+CUDA_ROUTINE_HANDLER(GraphDestroyNode);
+CUDA_ROUTINE_HANDLER(GraphNodeGetType);
+CUDA_ROUTINE_HANDLER(GraphNodeFindInClone);
+CUDA_ROUTINE_HANDLER(GraphAddEmptyNode);
+CUDA_ROUTINE_HANDLER(GraphAddChildGraphNode);
+CUDA_ROUTINE_HANDLER(GraphChildGraphNodeGetGraph);
+CUDA_ROUTINE_HANDLER(GraphAddKernelNode);
+CUDA_ROUTINE_HANDLER(GraphAddHostNode);
+CUDA_ROUTINE_HANDLER(GraphAddMemcpyNode);
+CUDA_ROUTINE_HANDLER(GraphAddMemcpyNode1D);
+CUDA_ROUTINE_HANDLER(GraphAddMemcpyNodeFromSymbol);
+CUDA_ROUTINE_HANDLER(GraphAddMemcpyNodeToSymbol);
+CUDA_ROUTINE_HANDLER(GraphAddMemsetNode);
+CUDA_ROUTINE_HANDLER(GraphAddEventRecordNode);
+CUDA_ROUTINE_HANDLER(GraphAddEventWaitNode);
+CUDA_ROUTINE_HANDLER(GraphAddExternalSemaphoresSignalNode);
+CUDA_ROUTINE_HANDLER(GraphAddExternalSemaphoresWaitNode);
+CUDA_ROUTINE_HANDLER(GraphAddMemAllocNode);
+CUDA_ROUTINE_HANDLER(GraphAddMemFreeNode);
+CUDA_ROUTINE_HANDLER(GraphAddNode);
+CUDA_ROUTINE_HANDLER(GraphKernelNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphKernelNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphKernelNodeGetAttribute);
+CUDA_ROUTINE_HANDLER(GraphKernelNodeSetAttribute);
+CUDA_ROUTINE_HANDLER(GraphKernelNodeCopyAttributes);
+CUDA_ROUTINE_HANDLER(GraphHostNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphHostNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphMemcpyNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphMemcpyNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphMemcpyNodeSetParams1D);
+CUDA_ROUTINE_HANDLER(GraphMemcpyNodeSetParamsFromSymbol);
+CUDA_ROUTINE_HANDLER(GraphMemcpyNodeSetParamsToSymbol);
+CUDA_ROUTINE_HANDLER(GraphMemsetNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphMemsetNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphEventRecordNodeGetEvent);
+CUDA_ROUTINE_HANDLER(GraphEventRecordNodeSetEvent);
+CUDA_ROUTINE_HANDLER(GraphEventWaitNodeGetEvent);
+CUDA_ROUTINE_HANDLER(GraphEventWaitNodeSetEvent);
+CUDA_ROUTINE_HANDLER(GraphExternalSemaphoresSignalNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphExternalSemaphoresSignalNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExternalSemaphoresWaitNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphExternalSemaphoresWaitNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphMemAllocNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphMemFreeNodeGetParams);
+CUDA_ROUTINE_HANDLER(GraphNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecKernelNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecMemcpyNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecMemsetNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecHostNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecUpdate);
+CUDA_ROUTINE_HANDLER(GraphDebugDotPrint);
+CUDA_ROUTINE_HANDLER(GraphAddDependencies_v2);
+CUDA_ROUTINE_HANDLER(GraphRemoveDependencies_v2);
+CUDA_ROUTINE_HANDLER(GraphGetEdges_v2);
+CUDA_ROUTINE_HANDLER(GraphNodeGetDependencies);
+CUDA_ROUTINE_HANDLER(GraphNodeGetDependencies_v2);
+CUDA_ROUTINE_HANDLER(GraphNodeGetDependentNodes);
+CUDA_ROUTINE_HANDLER(GraphNodeGetDependentNodes_v2);
+CUDA_ROUTINE_HANDLER(GraphAddNode_v2);
+CUDA_ROUTINE_HANDLER(GraphInstantiateWithParams);
+CUDA_ROUTINE_HANDLER(GraphExecGetFlags);
+CUDA_ROUTINE_HANDLER(GraphExecChildGraphNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecMemcpyNodeSetParams1D);
+CUDA_ROUTINE_HANDLER(GraphExecMemcpyNodeSetParamsFromSymbol);
+CUDA_ROUTINE_HANDLER(GraphExecMemcpyNodeSetParamsToSymbol);
+CUDA_ROUTINE_HANDLER(GraphExecEventRecordNodeSetEvent);
+CUDA_ROUTINE_HANDLER(GraphExecEventWaitNodeSetEvent);
+CUDA_ROUTINE_HANDLER(GraphExecExternalSemaphoresSignalNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecExternalSemaphoresWaitNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphExecNodeSetParams);
+CUDA_ROUTINE_HANDLER(GraphNodeGetEnabled);
+CUDA_ROUTINE_HANDLER(GraphNodeSetEnabled);
+CUDA_ROUTINE_HANDLER(DeviceGetGraphMemAttribute);
+CUDA_ROUTINE_HANDLER(DeviceSetGraphMemAttribute);
+CUDA_ROUTINE_HANDLER(DeviceGraphMemTrim);
+CUDA_ROUTINE_HANDLER(UserObjectCreate);
+CUDA_ROUTINE_HANDLER(UserObjectRetain);
+CUDA_ROUTINE_HANDLER(UserObjectRelease);
+CUDA_ROUTINE_HANDLER(GraphRetainUserObject);
+CUDA_ROUTINE_HANDLER(GraphReleaseUserObject);
+CUDA_ROUTINE_HANDLER(GraphConditionalHandleCreate);
 #endif /* _CUDARTHANDLER_H */

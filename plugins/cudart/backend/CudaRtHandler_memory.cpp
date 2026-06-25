@@ -566,9 +566,12 @@ CUDA_ROUTINE_HANDLER(MemcpyAsync) {
                     return std::make_shared<Result>(cudaErrorMemoryAllocation);
                 }
                 exit_code = cudaMemcpyAsync(dst, src, count, kind, stream);
+                if (exit_code == cudaSuccess) {
+                    exit_code = cudaStreamSynchronize(stream);
+                }
                 try {
                     LOG4CPLUS_DEBUG(Logger::getInstance(LOG4CPLUS_TEXT("GVirtuS")),
-                                    "cudaMemcpyAsync HostToDevice: dst: "
+                                    "cudaMemcpyAsync DeviceToHost: dst: "
                                         << dst << ", src: " << src << ", count: " << count
                                         << ", kind: " << kind << ", stream: " << stream);
                     out = std::make_shared<Buffer>();

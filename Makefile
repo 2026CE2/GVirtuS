@@ -1,13 +1,4 @@
-.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-human-parsing-test
-
-docker-build-push-dev:
-	docker buildx build \
-		--platform linux/amd64 \
-		--push \
-		--no-cache \
-		-f docker/dev/Dockerfile \
-		-t taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04 \
-		.
+.PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test run-openpose-native-test docker-build-2d-human-parsing run-2d-human-parsing-test run-simple-matrix-test  run-async-shortkernel-test run-cuda-graph-test run-cuda-graph-native-test docker-build-pytorch-cuda-graphs run-pytorch-cuda-graphs-test run-pytorch-import-smoke-test
 
 docker-build-push-prod:
 	docker buildx build \
@@ -18,90 +9,250 @@ docker-build-push-prod:
 		-t taslanidis/gvirtus:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
+# Builds a base image.
+docker-build-gvirtus:
+	docker buildx build \
+		--platform linux/amd64 \
+		-f docker/dev/Dockerfile \
+		-t gvirtus:cuda12.6 \
+		.
+
+# Builds a reusable PyTorch-on-GVirtuS base image so examples do not reinstall
+# Python and torch on every rebuild.
+docker-build-gvirtus-pytorch: docker-build-gvirtus
+	docker buildx build \
+		--platform linux/amd64 \
+		-f examples/pytorch-cuda-graphs/Dockerfile.base \
+		-t gvirtus-pytorch:cuda12.6 \
+		examples/pytorch-cuda-graphs
+
+# Runs the backend development container.
+# Run docker-build-gvirtus first to build the base image.
 run-gvirtus-backend-dev:
 	docker run \
 		--rm \
 		-it \
 		--network host \
 		--privileged \
-		-v ./cmake:/gvirtus/cmake/ \
-		-v ./etc:/gvirtus/etc/ \
-		-v ./include:/gvirtus/include/ \
-		-v ./plugins:/gvirtus/plugins/ \
-		-v ./src:/gvirtus/src/ \
-		-v ./tools:/gvirtus/tools/ \
-		-v ./tests:/gvirtus/tests/ \
-		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
+		--ulimit nofile=65536:524288 \
+		-v ./etc:/opt/GVirtuS/etc/ \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./docker/dev/entrypoint.sh:/entrypoint.sh \
-		-v ./examples:/gvirtus/examples/ \
 		--entrypoint /entrypoint.sh \
-		--name gvirtus \
+		--name gvirtus-backend-dev \
 		--runtime=nvidia \
 		--shm-size=8G \
-		tinghui8576/gvirtus-dev:cuda12.6.3-cudnn-ubuntu22.04
-
-attach-gvirtus-bash:
-		docker exec -it gvirtus bash
+		gvirtus:cuda12.6
 
 run-gvirtus-tests:
 	docker exec \
-		-it gvirtus \
+		-it gvirtus-backend-dev \
 		bash -c \
 		'export LD_LIBRARY_PATH=$$GVIRTUS_HOME/lib/frontend:$$LD_LIBRARY_PATH && \
 			cd /gvirtus/build && \
 			ctest --output-on-failure'
 
-stop-gvirtus:
-	docker stop gvirtus
-
-
+# Build the OpenPose example.
+# Run docker-build-gvirtus first to build the base image.
 docker-build-openpose:
 	docker buildx build \
 		--platform linux/amd64 \
-		--push \
-		--no-cache \
 		-f examples/openpose/Dockerfile \
-		-t darsh916/openpose_gvirtus:cuda12.6 \
-		examples/openpose	
+		-t openpose_gvirtus:cuda12.6 \
+		examples/openpose
 
-
+# Runs the OpenPose example test.
 run-openpose-test: 
 	docker run --rm \
-		--name openpose_container \
+		--name openpose_test_container \
 		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/openpose/media:/opt/openpose/examples/media \
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
-		darsh916/openpose_gvirtus:cuda12.6 \
+		openpose_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
-stop-openpose-test:
-	docker stop openpose_test_container || true
+# Runs test_multiple.cpp natively (direct GPU, no GVirtuS interception) for baseline performance.
+# Requires the openpose_gvirtus:cuda12.6 image (run docker-build-openpose first).
+# Override the image with: make run-openpose-native-test OPENPOSE_IMAGE=openpose_local:latest
+run-openpose-native-test:
+	OPENPOSE_IMAGE=$(or $(OPENPOSE_IMAGE),openpose_gvirtus:cuda12.6) \
+		bash examples/openpose/run_native.sh
 
-
-
+# Builds the 2D Human Parsing example.
+# Run docker-build-gvirtus first to build the base image.
 docker-build-2d-human-parsing:
 	docker buildx build \
 		--platform linux/amd64 \
-		--push \
-		--no-cache \
 		-f examples/2d-human-parsing/Dockerfile \
-		-t darsh916/human-parsing_gvirtus:cuda12.6 \
+		-t human-parsing_gvirtus:cuda12.6 \
 		examples/2d-human-parsing	
 
-
+# Runs the 2D Human Parsing example test.
 run-2d-human-parsing-test: 
 	docker run --rm \
 		--name human_parsing_test_container \
 		--network host \
 		--shm-size=8G \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/2d-human-parsing/inference_acc_00.py:/opt/2D-Human-Parsing/inference/inference_acc_00.py \
 		-v ./examples/2d-human-parsing/demo_imgs:/opt/2D-Human-Parsing/demo_imgs \
 		-v ./examples/2d-human-parsing/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/2d-human-parsing/entrypoint.sh:/entrypoint.sh \
-		darsh916/human-parsing_gvirtus:cuda12.6 \
+		human-parsing_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
-stop-2d-human-parsing-test:
-	docker stop human-parsing_test_container || true
+# Builds the PyTorch CUDA Graphs example.
+# Run docker-build-gvirtus-pytorch first to build the cached PyTorch base.
+docker-build-pytorch-cuda-graphs: docker-build-gvirtus-pytorch
+	docker buildx build \
+		--platform linux/amd64 \
+		-f examples/pytorch-cuda-graphs/Dockerfile \
+		-t pytorch-cuda-graphs_gvirtus:cuda12.6 \
+		examples/pytorch-cuda-graphs
+
+# Runs the PyTorch CUDA Graphs example test.
+run-pytorch-cuda-graphs-test:
+	docker run --rm \
+		--name pytorch_cuda_graphs_test_container \
+		--network host \
+		--shm-size=8G \
+		-e PYTORCH_CUDA_GRAPHS_BATCH_SIZE \
+		-e PYTORCH_CUDA_GRAPHS_BENCHMARK_ITERS \
+		-e PYTORCH_CUDA_GRAPHS_OUTPUT_JSON \
+		-e PYTORCH_CUDA_GRAPHS_OUTPUT_CSV \
+		-e PYTORCH_CUDA_GRAPHS_NUM_RUNS \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/pytorch-cuda-graphs:/opt/GVirtuS/examples/pytorch-cuda-graphs \
+		-v ./examples/pytorch-cuda-graphs/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/pytorch-cuda-graphs/entrypoint.sh:/entrypoint.sh \
+		pytorch-cuda-graphs_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+run-pytorch-import-smoke-test:
+	docker run --rm \
+		--name pytorch_import_smoke_test_container \
+		--network host \
+		--shm-size=8G \
+		-e PYTORCH_CUDA_GRAPHS_MODE=import-smoke \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/pytorch-cuda-graphs:/opt/GVirtuS/examples/pytorch-cuda-graphs \
+		-v ./examples/pytorch-cuda-graphs/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/pytorch-cuda-graphs/entrypoint.sh:/entrypoint.sh \
+		pytorch-cuda-graphs_gvirtus:cuda12.6 \
+		bash /entrypoint.sh
+
+# Runs the simple matrix example test.
+run-simple-matrix-test:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_test_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
+		-v ./examples/simple_matrix/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh
+
+# Simple Matrix example.
+run-simple-matrix-paper-test:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_test_paper_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/simple_matrix_paper/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/simple_matrix_paper:/opt/GVirtuS/examples/simple_matrix_paper \
+		-v ./examples/simple_matrix_paper/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh
+
+# Runs the CUDA Graph API test.
+run-cuda-graph-test:
+	docker run \
+		--rm \
+		-it \
+		--name cuda_graph_test_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/cuda_graph_test/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/cuda_graph_test:/opt/GVirtuS/examples/cuda_graph_test \
+		-v ./examples/cuda_graph_test/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh
+
+# Runs the async shortKernel benchmark (showcases QUIC async pipelining).
+run-async-shortkernel-test:
+	docker run \
+		--rm \
+		-it \
+		--name async_shortkernel_test_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/async_shortkernel_test/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/async_shortkernel_test:/opt/GVirtuS/examples/async_shortkernel_test \
+		-v ./examples/async_shortkernel_test/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh
+
+# Runs the async shortKernel test natively (direct GPU, no GVirtuS interception) for baseline performance.
+run-async-shortkernel-native-test:
+	docker run \
+		--rm \
+		-it \
+		--name async_shortkernel_native_test_container \
+		--runtime=nvidia \
+		-v ./examples/async_shortkernel_test:/opt/GVirtuS/examples/async_shortkernel_test \
+		gvirtus:cuda12.6 \
+		bash -c '\
+			cd /opt/GVirtuS/examples/async_shortkernel_test && \
+			nvcc async_shortkernel_test.cu -o async_shortkernel_test_native && \
+			./async_shortkernel_test_native \
+		'
+
+# Runs the CUDA Graph test natively (direct GPU, no GVirtuS interception) for baseline performance.
+
+run-cuda-graph-native-test:
+	docker run \
+		--rm \
+		-it \
+		--name cuda_graph_native_test_container \
+		--runtime=nvidia \
+		-v ./examples/cuda_graph_test:/opt/GVirtuS/examples/cuda_graph_test \
+		gvirtus:cuda12.6 \
+		bash -c '\
+			cd /opt/GVirtuS/examples/cuda_graph_test && \
+			nvcc cuda_graph_test.cu -o cuda_graph_test_native && \
+			./cuda_graph_test_native \
+		'

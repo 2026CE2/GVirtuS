@@ -1,0 +1,143 @@
+{
+  "quic_settings": {
+
+    "IdleTimeoutMs": 30000,
+    "IsSet_IdleTimeoutMs": false,
+
+    "HandshakeIdleTimeoutMs": 2000,
+    "IsSet_HandshakeIdleTimeoutMs": false,
+
+    "DisconnectTimeoutMs": 10000,
+    "IsSet_DisconnectTimeoutMs": false,
+
+    "KeepAliveIntervalMs": 0,
+    "IsSet_KeepAliveIntervalMs": false,
+
+    "PeerBidiStreamCount": 65535,
+    "IsSet_PeerBidiStreamCount": true,
+
+    "PeerUnidiStreamCount": 65535,
+    "IsSet_PeerUnidiStreamCount": true,
+
+    "MaxBytesPerKey": 0,
+    "IsSet_MaxBytesPerKey": false,
+
+    "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
+    "IsSet_ServerResumptionLevel": false,
+
+    "InitialWindowPackets": 100,
+    "IsSet_InitialWindowPackets": false,
+
+    "SendBufferingEnabled": 1,
+    "IsSet_SendBufferingEnabled": false,
+
+    "PacingEnabled": 1,
+    "IsSet_PacingEnabled": false,
+
+    "MigrationEnabled": 0,
+    "IsSet_MigrationEnabled": false,
+
+    "DatagramReceiveEnabled": 0,
+    "IsSet_DatagramReceiveEnabled": false,
+
+    "MaxAckDelayMs": 1,
+    "IsSet_MaxAckDelayMs": true,
+
+    "StreamRecvWindowDefault": 8388608,
+    "IsSet_StreamRecvWindowDefault": false,
+
+    "StreamRecvBufferDefault": 8388608,
+    "IsSet_StreamRecvBufferDefault": false,
+
+    "ConnFlowControlWindow": 16777216,
+    "IsSet_ConnFlowControlWindow": false,
+
+    "MaxWorkerQueueDelayUs": 500,
+    "IsSet_MaxWorkerQueueDelayUs": false,
+
+    "MaxStatelessOperations": 0,
+    "IsSet_MaxStatelessOperations": false,
+
+    "InitialRttMs": 1,
+    "IsSet_InitialRttMs": false,
+
+    "MaximumMtu": 1500,
+    "IsSet_MaximumMtu": false,
+
+    "MinimumMtu": 1500,
+    "IsSet_MinimumMtu": false,
+
+    "EcnEnabled": 1,
+    "IsSet_EcnEnabled": false,
+
+    "HyStartEnabled": 0,
+    "IsSet_HyStartEnabled": false,
+
+    "MtuDiscoverySearchCompleteTimeoutUs": 600000000,
+    "IsSet_MtuDiscoverySearchCompleteTimeoutUs": false,
+
+    "TlsClientMaxSendBuffer": 8388608,
+    "IsSet_TlsClientMaxSendBuffer": false,
+
+    "TlsServerMaxSendBuffer": 8388608,
+    "IsSet_TlsServerMaxSendBuffer": false,
+
+    "SendIdleTimeoutMs": 0,
+    "IsSet_SendIdleTimeoutMs": false,
+
+    "CongestionControlAlgorithm": 0,
+    "IsSet_CongestionControlAlgorithm": true,
+
+    "MaxBindingStatelessOperations": 100,
+    "IsSet_MaxBindingStatelessOperations": false,
+
+    "StatelessOperationExpirationMs": 100,
+    "IsSet_StatelessOperationExpirationMs": false,
+
+    "MaxOperationsPerDrain": 64,
+    "IsSet_MaxOperationsPerDrain": false,
+
+    "MtuDiscoveryMissingProbeCount": 3,
+    "IsSet_MtuDiscoveryMissingProbeCount": false,
+
+    "DestCidUpdateIdleTimeoutMs": 20000,
+
+    "IsSet_DestCidUpdateIdleTimeoutMs": false,
+
+    "GreaseQuicBitEnabled": 0,
+    "IsSet_GreaseQuicBitEnabled": false,
+
+    "StreamRecvWindowBidiLocalDefault": 8388608,
+    "IsSet_StreamRecvWindowBidiLocalDefault": false,
+
+    "StreamRecvWindowBidiRemoteDefault": 8388608,
+    "IsSet_StreamRecvWindowBidiRemoteDefault": false,
+
+    "StreamRecvWindowUnidiDefault": 8388608,
+    "IsSet_StreamRecvWindowUnidiDefault": false,
+    
+    "EncryptionOffloadAllowed": 1,
+    "IsSet_EncryptionOffloadAllowed": false,
+
+    "ReliableResetEnabled": 0,
+    "IsSet_ReliableResetEnabled": false,
+
+    "OneWayDelayEnabled": 0,
+    "IsSet_OneWayDelayEnabled": false,
+
+    "NetStatsEventEnabled": 0,
+    "IsSet_NetStatsEventEnabled": false,
+
+    "StreamMultiReceiveEnabled": 1,
+    "IsSet_StreamMultiReceiveEnabled": false,
+
+    "XdpEnabled": 1,
+    "IsSet_XdpEnabled": false,
+
+    "QTIPEnabled": 1,
+    "IsSet_QTIPEnabled": false,
+    
+    "RioEnabled": 0,
+    "IsSet_RioEnabled": false
+  }
+}

@@ -48,7 +48,15 @@ CudaRtHandler::CudaRtHandler() {
     Initialize();
 }
 
-CudaRtHandler::~CudaRtHandler() {}
+CudaRtHandler::~CudaRtHandler() {
+    delete mpFatBinary;
+    delete mpDeviceFunction;
+    delete mpVar;
+    delete mpTexture;
+    delete mpSurface;
+    delete mapHost2DeviceFunc;
+    delete mapDeviceFunc2InfoFunc;
+}
 
 bool CudaRtHandler::CanExecute(std::string routine) {
     map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;
@@ -282,6 +290,7 @@ void CudaRtHandler::Initialize() {
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(PushCallConfiguration));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(PopCallConfiguration));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(LaunchKernel));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(LaunchCooperativeKernel));
     /* CudaRtHandler_internal */
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterFatBinary));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterFatBinaryEnd));
@@ -359,6 +368,7 @@ void CudaRtHandler::Initialize() {
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphInstantiateWithFlags));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecDestroy));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphUpload));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetDependencies));
 
     /* CudaRtHandler_version */
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(DriverGetVersion));
@@ -366,4 +376,91 @@ void CudaRtHandler::Initialize() {
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(FuncSetCacheConfig));
     /* CudaRtHandler_api*/
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(FuncSetAttribute));
+    /* Cuda Graph Extensions*/
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphClone));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddDependencies));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphRemoveDependencies));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphGetEdges));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphGetRootNodes));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphDestroyNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetType));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeFindInClone));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddEmptyNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddChildGraphNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphChildGraphNodeGetGraph));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddKernelNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddHostNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddMemcpyNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddMemcpyNode1D));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddMemcpyNodeFromSymbol));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddMemcpyNodeToSymbol));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddMemsetNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddEventRecordNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddEventWaitNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddExternalSemaphoresSignalNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddExternalSemaphoresWaitNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddMemAllocNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddMemFreeNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddNode));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphKernelNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphKernelNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphKernelNodeGetAttribute));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphKernelNodeSetAttribute));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphKernelNodeCopyAttributes));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphHostNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphHostNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemcpyNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemcpyNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemcpyNodeSetParams1D));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemcpyNodeSetParamsFromSymbol));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemcpyNodeSetParamsToSymbol));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemsetNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemsetNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphEventRecordNodeGetEvent));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphEventRecordNodeSetEvent));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphEventWaitNodeGetEvent));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphEventWaitNodeSetEvent));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExternalSemaphoresSignalNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExternalSemaphoresSignalNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExternalSemaphoresWaitNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExternalSemaphoresWaitNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemAllocNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphMemFreeNodeGetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecKernelNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecMemcpyNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecMemsetNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecHostNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecUpdate));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphDebugDotPrint));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddDependencies_v2));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphRemoveDependencies_v2));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphGetEdges_v2));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetDependencies));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetDependencies_v2));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetDependentNodes));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetDependentNodes_v2));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphAddNode_v2));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphInstantiateWithParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecGetFlags));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecChildGraphNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecMemcpyNodeSetParams1D));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecMemcpyNodeSetParamsFromSymbol));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecMemcpyNodeSetParamsToSymbol));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecEventRecordNodeSetEvent));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecEventWaitNodeSetEvent));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecExternalSemaphoresSignalNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecExternalSemaphoresWaitNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecNodeSetParams));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetEnabled));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeSetEnabled));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(DeviceGetGraphMemAttribute));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(DeviceSetGraphMemAttribute));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(DeviceGraphMemTrim));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(UserObjectCreate));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(UserObjectRetain));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(UserObjectRelease));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphRetainUserObject));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphReleaseUserObject));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphConditionalHandleCreate));
 }

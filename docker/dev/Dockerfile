@@ -1,10 +1,9 @@
-## This Dockerfile is for building a GVirtuS image with CUDA support.
-## It does not include the Gvirtus source code, as it is expected to be mounted at runtime (useful for development).
-## The image will be pushed at taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04 using the `make docker-build-push-dev` command.
-
 FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 RUN apt update && apt install -y --no-install-recommends \
     build-essential \
+    git \
+    libssl-dev \
+    ca-certificates \
     libxmu-dev \
     libxi-dev \
     libgl-dev \
@@ -15,12 +14,35 @@ RUN apt update && apt install -y --no-install-recommends \
     libgtest-dev \
     liblz4-dev \
     cmake \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-ENV GVIRTUS_HOME=/usr/local/gvirtus
-ENV GVIRTUS_LOGLEVEL=0
-ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${LD_LIBRARY_PATH}
 
-COPY ./docker/dev/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+ENV GVIRTUS_HOME=/opt/GVirtuS
+    
+COPY ./msquic ${GVIRTUS_HOME}/msquic
+RUN cd ${GVIRTUS_HOME}/msquic &&  \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DQUIC_API_PREVIEW_FEATURES=ON && \
+    cmake --build build && \
+    cmake --install build
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+COPY ./src/ ${GVIRTUS_HOME}/src/
+COPY ./include/ ${GVIRTUS_HOME}/include/
+COPY ./etc/ ${GVIRTUS_HOME}/etc/
+COPY ./cmake/ ${GVIRTUS_HOME}/cmake/
+COPY ./lib/ ${GVIRTUS_HOME}/lib/
+COPY ./plugins/ ${GVIRTUS_HOME}/plugins/
+COPY ./tests/ ${GVIRTUS_HOME}/tests/
+COPY ./CMakeLists.txt ${GVIRTUS_HOME}/CMakeLists.txt
+
+WORKDIR ${GVIRTUS_HOME}
+RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} \
+    -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda-12.6/targets/x86_64-linux/lib/stubs -L/usr/local/cuda/lib64/stubs" \
+    -DQUIC_API_PREVIEW_FEATURES=ON && \
+    cd build && \
+    make -j$(nproc) && make install
+
+ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:/usr/local/lib:${LD_LIBRARY_PATH}
+WORKDIR ${GVIRTUS_HOME}

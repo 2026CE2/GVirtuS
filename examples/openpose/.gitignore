@@ -1,0 +1,4 @@
+# Caffe
+*.caffemodel
+*.csv
+00_test

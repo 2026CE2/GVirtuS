@@ -1,0 +1,15 @@
+{
+  "batch_size": 128,
+  "benchmark_iters": 10,
+  "dtype": "float32",
+  "eager_final_loss": 6.911291542157174e+20,
+  "eager_ms_per_iter": 73.989,
+  "eager_ms_total": 739.886,
+  "final_loss_close": true,
+  "graph_final_loss": 6.911201470164626e+20,
+  "graph_ms_per_iter": 7.562,
+  "graph_ms_total": 75.624,
+  "max_param_abs_diff": 6.911291542157174e+20,
+  "speedup": 9.784,
+  "warmup_iters": 3
+}

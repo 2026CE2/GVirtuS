@@ -46,11 +46,13 @@
 #include <filesystem>
 #include <iostream>
 #include <mutex>
+#include <thread>
 
 #include "communicators/hybrid/HybridCommunicator.h"
 #include "log4cplus/configurator.h"
 #include "log4cplus/logger.h"
 #include "log4cplus/loggingmacros.h"
+#include "gvirtus/common/Property.h"
 
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
@@ -68,7 +70,11 @@ using gvirtus::frontend::Frontend;
 static Frontend msFrontend;
 std::mutex gFrontendMutex;
 map<pthread_t, Frontend *> *Frontend::mpFrontends = NULL;
+std::mutex Frontend::asyncOutputBuffersMutex;
+std::map<void*, std::shared_ptr<Frontend::AsyncStreamContext>> Frontend::mpAsyncOutputBuffers;
 static bool initialized = false;
+static thread_local Frontend* g_thread_frontend = nullptr;
+static thread_local gvirtus::communicators::Buffer* g_thread_output_buffer = nullptr;
 
 Logger logger;
 
@@ -117,23 +123,16 @@ void Frontend::Init(Communicator *c) {
 
     std::unique_ptr<char> default_endpoint;
 
-    // no frontend found
-    {
-        std::lock_guard<std::mutex> lock(gFrontendMutex);
-        if (mpFrontends->find(tid) == mpFrontends->end()) {
-            Frontend *f = new Frontend();
-            mpFrontends->insert(make_pair(tid, f));
-        }
-    }
-
     LOG4CPLUS_INFO(logger, "Using properties file: " + config_path);
 
     try {
         auto endpoint = EndpointFactory::get_endpoint(config_path);
+        gvirtus::common::Property _properties = common::JSON<gvirtus::common::Property>(config_path).parser();
 
-        mpFrontends->find(tid)->second->_communicator =
-            CommunicatorFactory::get_communicator(endpoint);
-        mpFrontends->find(tid)->second->_communicator->obj_ptr()->Connect();
+
+        
+        this->_communicator = CommunicatorFactory::get_communicator(endpoint, _properties.secure());
+        this->_communicator->obj_ptr()->Connect();
     } catch (const std::exception &e) {
         LOG4CPLUS_FATAL(logger, fs::path(__FILE__).filename()
                                     << ":" << __LINE__ << ":"
@@ -141,11 +140,11 @@ void Frontend::Init(Communicator *c) {
         exit(EXIT_FAILURE);
     }
 
-    mpFrontends->find(tid)->second->mpInputBuffer = std::make_shared<Buffer>();
-    mpFrontends->find(tid)->second->mpOutputBuffer = std::make_shared<Buffer>();
-    mpFrontends->find(tid)->second->mpLaunchBuffer = std::make_shared<Buffer>();
-    mpFrontends->find(tid)->second->mExitCode = -1;
-    mpFrontends->find(tid)->second->mpInitialized = true;
+    this->mpInputBuffer = std::make_shared<Buffer>();
+    this->mpOutputBuffer = std::make_shared<Buffer>();
+    this->mpLaunchBuffer = std::make_shared<Buffer>();
+    this->mExitCode = -1;
+    this->mpInitialized = true;
 }
 
 Frontend::~Frontend() {
@@ -153,6 +152,8 @@ Frontend::~Frontend() {
     if (destroying || mpFrontends == nullptr) return;
     destroying = true;
 
+    std::cerr << "[GVIRTUS_FRONTEND] ~Frontend begin this=" << this
+              << " map=" << mpFrontends << std::endl;
     std::lock_guard<std::mutex> lock(gFrontendMutex);
     {
         pid_t tid = syscall(SYS_gettid);
@@ -164,6 +165,8 @@ Frontend::~Frontend() {
         // Safe iteration while erasing entries
         for (auto it = mpFrontends->begin(); it != mpFrontends->end(); /* no increment here */) {
             if (it->second == this) {
+                std::cerr << "[GVIRTUS_FRONTEND] removing self entry tid=" << it->first
+                          << " frontend=" << it->second << std::endl;
                 it = mpFrontends->erase(it);
                 continue;
             }
@@ -178,18 +181,27 @@ Frontend::~Frontend() {
                           << it->second->mDataReceived / (1024 * 1024.0) << " Mb(s) in "
                           << it->second->mReceivingTime << " second(s)\n";
             }
-
-            delete it->second;
+            it->second->_communicator->obj_ptr()->Close();
+            if (it->first != tid) {
+                delete it->second;
+            }
             it = mpFrontends->erase(it);
         }
 
         // Delete the map itself and set pointer to nullptr
+        std::cerr << "[GVIRTUS_FRONTEND] deleting frontend map" << std::endl;
         delete mpFrontends;
         mpFrontends = nullptr;
     }
+    std::cerr << "[GVIRTUS_FRONTEND] ~Frontend end this=" << this << std::endl;
 }
 
 Frontend *Frontend::GetFrontend(Communicator *c) {
+    // Check if this thread has a registered frontend (e.g., from async worker)
+    if (g_thread_frontend != nullptr) {
+        return g_thread_frontend;
+    }
+
     {
         std::lock_guard<std::mutex> lock(gFrontendMutex);
         if (mpFrontends == nullptr) mpFrontends = new map<pthread_t, Frontend *>();
@@ -217,6 +229,18 @@ Frontend *Frontend::GetFrontend(Communicator *c) {
     }
 
     return f;
+}
+
+void Frontend::SetThreadFrontend(Frontend *frontend) {
+    g_thread_frontend = frontend;
+}
+
+void Frontend::SetThreadOutputBuffer(Buffer *output_buffer) {
+    g_thread_output_buffer = output_buffer;
+}
+
+Buffer *Frontend::GetOutputBuffer() {
+    return g_thread_output_buffer ? g_thread_output_buffer : mpOutputBuffer.get();
 }
 
 void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
@@ -323,12 +347,338 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
             hybrid->end_call();
         }
     }
+
+    std::cout << "[GVIRTUS] Routine '" << routine << "' executed with exit code " << exit_code
+              << " in " << server_exec_sec << " second(s)\n";
+}
+
+void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, void* stream,
+                              std::function<void()> callback) {
+    if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
+    LOG4CPLUS_DEBUG(logger, "Queued (async) '" << routine << "' | pid=" << getpid() << " tid=" << syscall(SYS_gettid));
+    pid_t tid = syscall(SYS_gettid);
+    Frontend *frontend = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(gFrontendMutex);
+        auto it = mpFrontends->find(tid);
+        if (it == mpFrontends->end()) {
+            LOG4CPLUS_ERROR(logger, "Cannot send any job request");
+            return;
+        }
+        frontend = it->second;
+    }
+
+    if (frontend->_communicator->obj_ptr()->to_string() != "quiccommunicator") {
+        Execute(routine, input_buffer);
+        if (callback) {
+            try {
+                callback();
+            } catch (const std::exception &e) {
+                LOG4CPLUS_ERROR(logger, "Execute_Async callback exception: " << e.what());
+            } catch (...) {
+                LOG4CPLUS_ERROR(logger, "Execute_Async callback exception: unknown error");
+            }
+        }
+        return;
+    }
+
+    std::shared_ptr<Buffer> queued_input = std::make_shared<Buffer>(*input_buffer);
+    auto job = std::make_shared<AsyncJob>(std::string(routine), queued_input, std::move(callback));
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async called on an unknown stream");
+            return;
+        }
+        context = it->second;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        if (context->stop_requested) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async called after Stop_Stream on stream");
+            return;
+        }
+        context->queue.push(job);
+    }
+    context->cv.notify_one();
+    frontend->mRoutinesExecuted++;
+}
+
+void Frontend::Execute_Async_Wait(const char *routine, const communicators::Buffer *input_buffer, void* stream,
+                                   std::function<void()> callback, communicators::Buffer *output_buffer) {
+    if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
+    LOG4CPLUS_DEBUG(logger, "Queued (async-wait) '" << routine << "' | pid=" << getpid() << " tid=" << syscall(SYS_gettid));
+
+    pid_t tid = syscall(SYS_gettid);
+    Frontend *frontend = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(gFrontendMutex);
+        auto it = mpFrontends->find(tid);
+        if (it == mpFrontends->end()) {
+            LOG4CPLUS_ERROR(logger, "Cannot send any job request");
+            return;
+        }
+        frontend = it->second;
+    }
+
+    if (frontend->_communicator->obj_ptr()->to_string() != "quiccommunicator") {
+        Execute(routine, input_buffer);
+        if (output_buffer) {
+            output_buffer->CopyFrom(*frontend->mpOutputBuffer);
+        }
+        if (callback) {
+            try {
+                callback();
+            } catch (const std::exception &e) {
+                LOG4CPLUS_ERROR(logger, "Execute_Async_Wait callback exception: " << e.what());
+            } catch (...) {
+                LOG4CPLUS_ERROR(logger, "Execute_Async_Wait callback exception: unknown error");
+            }
+        }
+        return;
+    }
+
+    std::shared_ptr<Buffer> queued_input = std::make_shared<Buffer>(*input_buffer);
+    auto job = std::make_shared<AsyncJob>(std::string(routine), queued_input, std::move(callback), output_buffer);
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async_Wait called on an unknown stream");
+            return;
+        }
+        context = it->second;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        if (context->stop_requested) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async_Wait called after Stop_Stream on stream");
+            return;
+        }
+        context->queue.push(job);
+    }
+    context->cv.notify_one();
+    frontend->mRoutinesExecuted++;
+    job->future.get();
+}
+
+void Frontend::Wait_Stream(void* stream) {
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            return;
+        }
+        context = it->second;
+    }
+
+    std::unique_lock<std::mutex> lock(context->mutex);
+    context->cv.wait(lock, [context] {
+        return !context->active_job && context->queue.empty();
+    });
+}
+
+void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            return;
+        }
+        context = it->second;
+    }
+
+    while (true) {
+        std::shared_ptr<AsyncJob> job;
+        {
+            std::unique_lock<std::mutex> lock(context->mutex);
+            context->cv.wait(lock, [context] {
+                return context->stop_requested || !context->queue.empty();
+            });
+            if (context->queue.empty() && context->stop_requested) {
+                break;
+            }
+            job = context->queue.front();
+            context->queue.pop();
+            context->active_job = true;
+        }
+
+        const std::string &routine = job->routine;
+        std::cout << "Processing async routine '" << routine << "' [pid=" << getpid()
+                  << ", tid=" << syscall(SYS_gettid) << "]\n";
+        std::shared_ptr<Buffer> input_buffer = job->input_buffer;
+        size_t in_size = input_buffer->GetBufferSize();
+        int exit_code = 0;
+        double server_exec_sec = 0.0;
+        double send_sec = 0.0;
+        double recv_sec = 0.0;
+
+        try {
+            std::cout << "Executing asynchonously routine '" << routine << "' [pid=" << getpid()
+                      << ", tid=" << syscall(SYS_gettid) << "]\n";
+
+            auto start_send = steady_clock::now();
+            frontend->_communicator->obj_ptr()->Write_Async(routine.c_str(), routine.size() + 1, stream);
+            frontend->mDataSent += in_size;
+            input_buffer->Dump_Async(frontend->_communicator->obj_ptr().get(), stream);
+            send_sec = duration_cast<milliseconds>(steady_clock::now() - start_send).count() / 1000.0;
+
+                        Buffer *async_output_buffer = job->output_buffer.get();
+            async_output_buffer->Reset();
+            auto start_recv = steady_clock::now();
+            int async_exit_code = 0;
+            double async_server_exec_sec = 0.0;
+            frontend->_communicator->obj_ptr()->Read_Async((char *)&exit_code, sizeof(int), stream);
+            frontend->mExitCode = exit_code;
+            frontend->_communicator->obj_ptr()->Read_Async(reinterpret_cast<char *>(&server_exec_sec),
+                                                          sizeof(server_exec_sec), stream);
+
+            size_t out_buffer_size = 0;
+            frontend->_communicator->obj_ptr()->Read_Async((char *)&out_buffer_size, sizeof(size_t), stream);
+            frontend->mDataReceived += out_buffer_size;
+            if (out_buffer_size > 0) {
+                async_output_buffer->Reset_Async(frontend->_communicator->obj_ptr().get(), stream, out_buffer_size);
+            }
+
+            std::cout << "Received output buffer of size " << out_buffer_size << " bytes\n";
+            recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
+
+            frontend->mRoutineExecutionTime += async_server_exec_sec;
+            frontend->mSendingTime += send_sec;
+            frontend->mReceivingTime += recv_sec;
+
+            LOG4CPLUS_DEBUG(logger, "Routine '" << routine << "' returned " << async_exit_code
+                                                << " | server_exec=" << async_server_exec_sec << "s"
+                                                << " | send=" << send_sec << "s"
+                                                << " | recv=" << recv_sec << "s"
+                                                << " | in=" << in_size << "B"
+                                                << " | out=" << out_buffer_size << "B"
+                                                << " | pid=" << getpid()
+                                                << " tid=" << syscall(SYS_gettid));
+
+            if (job->callback) {
+                Frontend::SetThreadFrontend(frontend);
+                Frontend::SetThreadOutputBuffer(async_output_buffer);
+                try {
+                    job->callback();
+                } catch (const std::exception &e) {
+                    LOG4CPLUS_ERROR(logger, "Async callback exception: " << e.what());
+                } catch (...) {
+                    LOG4CPLUS_ERROR(logger, "Async callback exception: unknown error");
+                }
+                Frontend::SetThreadOutputBuffer(nullptr);
+                Frontend::SetThreadFrontend(nullptr);
+            }
+            job->promise.set_value();
+        } catch (...) {
+            try {
+                job->promise.set_exception(std::current_exception());
+            } catch (...) {
+                // If promise is already satisfied or cannot be set, ignore.
+            }
+        }
+        {
+            std::lock_guard<std::mutex> lock(context->mutex);
+            context->active_job = false;
+        }
+        context->cv.notify_all();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it != mpAsyncOutputBuffers.end() && it->second == context) {
+            mpAsyncOutputBuffers.erase(it);
+        }
+    }
+
+    // Signal that this thread has fully exited so Stop_Stream can safely
+    // return (and allow the Frontend to be destroyed).
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        context->thread_done = true;
+    }
+    context->done_cv.notify_all();
+}
+
+
+void Frontend::Start_Stream(void* stream) {
+    if (this->_communicator->obj_ptr()->to_string() == "quiccommunicator") {
+        this->_communicator->obj_ptr()->Start_Stream(stream);
+
+        std::shared_ptr<AsyncStreamContext> context = std::make_shared<AsyncStreamContext>();
+        {
+            std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+            mpAsyncOutputBuffers[stream] = context;
+        }
+
+        pid_t tid = syscall(SYS_gettid);
+        Frontend *frontend = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(gFrontendMutex);
+            auto it = mpFrontends->find(tid);
+            if (it == mpFrontends->end()) {
+                LOG4CPLUS_ERROR(logger, "Cannot send any job request");
+                return;
+            }
+            frontend = it->second;
+        }
+
+        std::thread(Execute_Detached, stream, frontend).detach();
+    }
+}
+
+void Frontend::Stop_Stream(void* stream) {
+    if (this->_communicator->obj_ptr()->to_string() == "quiccommunicator") {
+        // Shut down the QUIC stream so the backend's execute_async thread
+        // gets EOF on its pipe read and exits cleanly.
+        this->_communicator->obj_ptr()->Stop_Stream(stream);
+
+        std::shared_ptr<AsyncStreamContext> context;
+        {
+            std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+            auto it = mpAsyncOutputBuffers.find(stream);
+            if (it != mpAsyncOutputBuffers.end()) {
+                context = it->second;
+            }
+        }
+        if (context) {
+            {
+                std::lock_guard<std::mutex> lock(context->mutex);
+                context->stop_requested = true;
+            }
+            context->cv.notify_one();
+
+            // Wait until Execute_Detached has fully exited before returning.
+            // This guarantees the thread no longer holds the raw Frontend*
+            // pointer, so the Frontend object can be safely destroyed after
+            // cudaStreamDestroy returns.
+            std::unique_lock<std::mutex> lk(context->mutex);
+            context->done_cv.wait(lk, [&context] { return context->thread_done; });
+        }
+    }
 }
 
 void Frontend::Prepare() {
     pid_t tid = syscall(SYS_gettid);
     {
-        if (this->mpFrontends->find(tid) != mpFrontends->end())
+        // Hold the mutex while reading mpFrontends to prevent a data race with
+        // GetFrontend() calls from other threads (e.g. OpenPose worker threads)
+        // that may be inserting a new entry for their own tid at the same time.
+        std::lock_guard<std::mutex> lock(gFrontendMutex);
+        if (mpFrontends->find(tid) != mpFrontends->end())
             mpFrontends->find(tid)->second->mpInputBuffer->Reset();
     }
+}
+
+bool Frontend::findStream(void* stream) {
+    std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+    return mpAsyncOutputBuffers.find(stream) != mpAsyncOutputBuffers.end();
 }
